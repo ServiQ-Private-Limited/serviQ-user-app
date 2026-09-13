@@ -220,6 +220,36 @@ void main() {
       expect(store.blob, isNotNull);
     });
 
+    test('a request can revive a session the launch could not', () async {
+      final store = FakePersistentStore();
+      await store.write(
+        StoredCredentials(refreshToken: 'still-good', user: testUser),
+      );
+
+      // Launched with no signal: the token survives, but nothing is held in
+      // memory to sign a request with.
+      final repository = FakeLoginRepository(
+        failure: const Failure(errorCode: 'CONNECTION_ERROR'),
+      );
+      final session = AuthSession(
+        store: store,
+        deviceIdentity: FakeDeviceIdentity(),
+        repository: repository,
+      );
+      expect(await session.bootstrap(), AuthBootstrapResult.offline);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.hasStoredCredential, isTrue);
+
+      // The network comes back while the app is still open. Without this the
+      // seeker would have to restart before anything worked again.
+      repository.failure = null;
+      repository.responses = [testTokens(refreshToken: 'rotated')];
+
+      expect(await session.refreshIfNeeded(), isTrue);
+      expect(session.isAuthenticated, isTrue);
+      expect((await store.read())?.refreshToken, 'rotated');
+    });
+
     test('a real rejection still clears the token', () async {
       final store = FakePersistentStore();
       await store.write(

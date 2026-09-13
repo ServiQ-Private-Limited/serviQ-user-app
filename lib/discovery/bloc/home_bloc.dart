@@ -47,6 +47,11 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       this.notificationRepository.changes.listen(_onBadgeChange),
     ]);
     add(const HomeBadgesChanged());
+    // The notification count comes from the server now, so the bell has to
+    // ask before it can badge. Failures are the repository's to swallow — a
+    // bell that cannot count is a bell without a badge, not an error to put
+    // in front of somebody browsing.
+    unawaited(this.notificationRepository.refreshBadge());
   }
 
   void _onBadgeChange(void _) {

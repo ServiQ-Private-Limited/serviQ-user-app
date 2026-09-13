@@ -9,7 +9,9 @@ import 'package:local_markerplace/discovery/repository/discovery_repository.dart
 import 'package:local_markerplace/me/bloc/saved_providers_bloc.dart';
 import 'package:local_markerplace/me/repository/me_repository.dart';
 import 'package:local_markerplace/notifications/bloc/notification_bloc.dart';
-import 'package:local_markerplace/notifications/repository/notification_repository.dart';
+import 'package:local_markerplace/network/failure.dart';
+
+import '../support/fake_notification_repository.dart';
 import 'package:local_markerplace/visit/bloc/visit_bloc.dart';
 import 'package:local_markerplace/visit/model/visit_mode.dart';
 import 'package:local_markerplace/visit/model/visit_service.dart';
@@ -22,20 +24,106 @@ void main() {
   Future<void> settle() => Future<void>.delayed(Duration.zero);
 
   group('notifications', () {
-    test('marking all read empties the badge', () async {
-      final bloc = NotificationBloc(
-        notificationRepository: NotificationRepository.shared,
-      )..add(const NotificationsRequested());
+    test('a page is drawn and marking read empties the badge', () async {
+      final repository = FakeNotificationRepository(
+        pages: [samplePage(count: 3, hasNext: false)],
+      );
+      final bloc = NotificationBloc(notificationRepository: repository)
+        ..add(const NotificationsRequested());
       await settle();
 
-      expect(bloc.state.notifications, isNotEmpty);
+      expect(bloc.state.notifications, hasLength(3));
       expect(bloc.state.hasUnread, isTrue);
+      expect(bloc.state.isLoading, isFalse);
 
       bloc.add(const AllNotificationsRead());
       await settle();
 
+      expect(repository.markedRead, 1);
       expect(bloc.state.hasUnread, isFalse);
       expect(bloc.state.unreadCount, 0);
+      await bloc.close();
+    });
+
+    test('the next page is appended rather than replacing the list', () async {
+      final repository = FakeNotificationRepository(
+        pages: [
+          samplePage(count: 2, hasNext: true),
+          samplePage(count: 2, page: 1, hasNext: false, startId: 100),
+        ],
+      );
+      final bloc = NotificationBloc(notificationRepository: repository)
+        ..add(const NotificationsRequested());
+      await settle();
+      expect(bloc.state.notifications, hasLength(2));
+      expect(bloc.state.hasNext, isTrue);
+
+      bloc.add(const NotificationsNextPageRequested());
+      await settle();
+
+      expect(bloc.state.notifications, hasLength(4));
+      expect(bloc.state.page, 1);
+      expect(bloc.state.hasNext, isFalse);
+      // The pages asked for, in order — never the same one twice.
+      expect(repository.requested, [0, 1]);
+      await bloc.close();
+    });
+
+    test('asking past the last page does nothing', () async {
+      final repository = FakeNotificationRepository(
+        pages: [samplePage(count: 2, hasNext: false)],
+      );
+      final bloc = NotificationBloc(notificationRepository: repository)
+        ..add(const NotificationsRequested());
+      await settle();
+
+      bloc.add(const NotificationsNextPageRequested());
+      await settle();
+
+      expect(repository.requested, [0]);
+      await bloc.close();
+    });
+
+    test('a failed first page offers a retry that clears it', () async {
+      final repository = FakeNotificationRepository(
+        pages: [samplePage(count: 2, hasNext: false)],
+        failFirst: const Failure(
+          errorMessage: 'Service unavailable',
+          errorCode: 'INTERNAL_ERROR',
+        ),
+      );
+      final bloc = NotificationBloc(notificationRepository: repository)
+        ..add(const NotificationsRequested());
+      await settle();
+
+      expect(bloc.state.failure?.errorCode, 'INTERNAL_ERROR');
+      expect(bloc.state.failedAt, isNotNull);
+      expect(bloc.state.isOffline, isFalse);
+
+      bloc.add(const NotificationsRequested());
+      await settle();
+
+      expect(bloc.state.failure, isNull);
+      expect(bloc.state.notifications, hasLength(2));
+      await bloc.close();
+    });
+
+    test('a failed later page leaves what is on screen alone', () async {
+      final repository = FakeNotificationRepository(
+        pages: [samplePage(count: 2, hasNext: true)],
+        failLater: const Failure(errorCode: 'CONNECTION_ERROR'),
+      );
+      final bloc = NotificationBloc(notificationRepository: repository)
+        ..add(const NotificationsRequested());
+      await settle();
+
+      bloc.add(const NotificationsNextPageRequested());
+      await settle();
+
+      // The seeker scrolled to the bottom of a list that still reads fine.
+      expect(bloc.state.notifications, hasLength(2));
+      expect(bloc.state.failure, isNull);
+      expect(bloc.state.isLoadingMore, isFalse);
       await bloc.close();
     });
   });

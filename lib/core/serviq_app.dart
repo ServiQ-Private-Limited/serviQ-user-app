@@ -78,9 +78,12 @@ Future<Widget> appBuilder(
   // A restored session still has to have been through onboarding — a user who
   // verified but closed the app mid-setup would otherwise land on discovery
   // knowing neither their locality nor what they came for.
+  final storedProfile = await _onboardingRepository.readProfile();
   final hasProfile =
-      bootstrap == AuthBootstrapResult.signedIn &&
-      await _onboardingRepository.readProfile() != null;
+      bootstrap == AuthBootstrapResult.signedIn && storedProfile != null;
+  // An offline launch cannot tell whether onboarding was finished from the
+  // session, so it goes on what is on disk.
+  final hasStoredProfile = storedProfile != null;
 
   return MultiRepositoryProvider(
     providers: [
@@ -98,6 +101,13 @@ Future<Widget> appBuilder(
         AuthBootstrapResult.signedIn when hasProfile =>
           AppRoutes.discovery.path,
         AuthBootstrapResult.signedIn => AppRoutes.onboarding.path,
+        // Opened with no signal. The credential was never refused — it is
+        // still on disk and the session revives on the first request that
+        // gets through — so the seeker carries on where they were and meets
+        // the app's own offline states, rather than a login screen that
+        // says they have been signed out when they have not.
+        AuthBootstrapResult.offline when hasStoredProfile =>
+          AppRoutes.discovery.path,
         _ => AppRoutes.login.path,
       },
     ),

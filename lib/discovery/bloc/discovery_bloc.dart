@@ -27,7 +27,16 @@ class DiscoveryBloc extends Bloc<DiscoveryEvent, DiscoveryState> {
     String? initialLocality,
     DiscoveryTab initialTab = DiscoveryTab.home,
   }) : super(
-         DiscoveryState.initial(localityName: initialLocality, tab: initialTab),
+         DiscoveryState.initial(
+           localityName: initialLocality,
+           tab: initialTab,
+           // Resolving from the first frame when there is a profile to read,
+           // rather than showing home for a frame and then swapping to the
+           // skeleton. That flash built home twice — two blocs, and two of
+           // every request they make on opening.
+           isResolvingLocality:
+               initialLocality == null && onboardingRepository != null,
+         ),
        ) {
     on<DiscoveryStarted>(_onStarted);
     on<DiscoveryTabSelected>(_onTabSelected);

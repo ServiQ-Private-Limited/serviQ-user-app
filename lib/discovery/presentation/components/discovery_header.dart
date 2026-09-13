@@ -162,6 +162,10 @@ class _HeaderAction extends StatelessWidget {
   final int badgeCount;
   final VoidCallback? onTap;
 
+  /// Stops at 99: past that the exact number is no longer information, and
+  /// the badge would be wider than the icon it sits on.
+  String get _badgeLabel => badgeCount > 99 ? '99+' : '$badgeCount';
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -183,15 +187,20 @@ class _HeaderAction extends StatelessWidget {
                 right: 3,
                 top: 0,
                 child: Container(
-                  width: 16,
+                  // A disc at one or two digits, as the design draws it, and
+                  // a stadium past that — a hundred unread is real, and a
+                  // fixed 16pt circle would have spilled the number over its
+                  // own edge rather than telling the seeker anything.
+                  constraints: const BoxConstraints(minWidth: 16),
                   height: 16,
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColor.authError,
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '$badgeCount',
+                    _badgeLabel,
                     style: const TextStyle(
                       fontFamily: DiscoveryText.family,
                       fontSize: 9,

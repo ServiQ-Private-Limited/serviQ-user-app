@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:local_markerplace/components/motion/entrance.dart';
+import 'package:local_markerplace/components/skeleton/skeleton.dart';
+import 'package:local_markerplace/components/states/empty_state.dart';
+import 'package:local_markerplace/components/states/error_state.dart';
 import 'package:local_markerplace/core/app_color.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_text.dart';
 import 'package:local_markerplace/notifications/bloc/notification_bloc.dart';
@@ -49,12 +52,54 @@ class NotificationsSheet extends StatelessWidget {
   }
 }
 
-class _NotificationsView extends StatelessWidget {
+class _NotificationsView extends StatefulWidget {
   const _NotificationsView();
+
+  @override
+  State<_NotificationsView> createState() => _NotificationsViewState();
+}
+
+class _NotificationsViewState extends State<_NotificationsView> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_loadMoreIfNeeded);
+  }
+
+  @override
+  void dispose() {
+    _scroll
+      ..removeListener(_loadMoreIfNeeded)
+      ..dispose();
+    super.dispose();
+  }
+
+  /// Asks for the next page a little before the end, so the list grows under
+  /// the thumb rather than stopping dead and then jumping.
+  ///
+  /// Called after every build as well as on every scroll, because a page
+  /// that happens to fit the screen leaves nothing to scroll — and a drawer
+  /// that can only load more when there is already more would never load
+  /// the rest.
+  void _loadMoreIfNeeded() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent - position.pixels > 320) return;
+    context.read<NotificationBloc>().add(
+      const NotificationsNextPageRequested(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<NotificationBloc>().state;
+    if (state.hasNext) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => mounted ? _loadMoreIfNeeded() : null,
+      );
+    }
     final now = DateTime.now();
     final today = state.todayAt(now);
     final earlier = state.earlierAt(now);
@@ -86,16 +131,28 @@ class _NotificationsView extends StatelessWidget {
                 // action steps back rather than sitting there doing nothing.
                 if (state.hasUnread)
                   PressableScale(
-                    onTap: () => context.read<NotificationBloc>().add(
-                      const AllNotificationsRead(),
-                    ),
+                    onTap: state.isMarkingRead
+                        ? null
+                        : () => context.read<NotificationBloc>().add(
+                            const AllNotificationsRead(),
+                          ),
                     pressedScale: 0.92,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 4,
                         vertical: 6,
                       ),
-                      child: Text('Mark all read', style: DiscoveryText.link),
+                      // Says it is working rather than looking like a tap
+                      // that did nothing, which is all a slow link would
+                      // otherwise show.
+                      child: Text(
+                        state.isMarkingRead ? 'Marking…' : 'Mark all read',
+                        style: state.isMarkingRead
+                            ? DiscoveryText.link.copyWith(
+                                color: AppColor.discoveryTextTertiary,
+                              )
+                            : DiscoveryText.link,
+                      ),
                     ),
                   ),
               ],
@@ -103,27 +160,81 @@ class _NotificationsView extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 24),
-              children: [
-                if (today.isNotEmpty) ...[
-                  const _SectionHeading('TODAY'),
-                  for (final (index, notification) in today.indexed)
-                    NotificationRow(notification: notification, index: index),
-                ],
-                if (earlier.isNotEmpty) ...[
-                  const _SectionHeading('EARLIER'),
-                  for (final (index, notification) in earlier.indexed)
-                    NotificationRow(
-                      notification: notification,
-                      index: today.length + index,
-                    ),
-                ],
-              ],
-            ),
+            child: state.isLoading
+                // Never a spinner: the drawer wears the shape it is about to
+                // become.
+                ? const SkeletonList(caption: 'Loading your notifications')
+                : state.failure != null
+                ? _error(context, state)
+                : state.isEmpty
+                ? const EmptyState(
+                    icon: Icons.notifications_none_rounded,
+                    title: 'Nothing here yet',
+                    body:
+                        'Bookings, offers and messages land here. Nothing '
+                        'has happened on your account so far.',
+                  )
+                : ListView(
+                    controller: _scroll,
+                    padding: const EdgeInsets.only(bottom: 24),
+                    children: [
+                      if (today.isNotEmpty) ...[
+                        const _SectionHeading('TODAY'),
+                        for (final (index, notification) in today.indexed)
+                          NotificationRow(
+                            notification: notification,
+                            index: index,
+                          ),
+                      ],
+                      if (earlier.isNotEmpty) ...[
+                        const _SectionHeading('EARLIER'),
+                        for (final (index, notification) in earlier.indexed)
+                          NotificationRow(
+                            notification: notification,
+                            index: today.length + index,
+                          ),
+                      ],
+                      if (state.isLoadingMore)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: SkeletonListRow(index: 0),
+                        )
+                      else if (!state.hasNext && state.notifications.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                          child: Text(
+                            'That is everything — '
+                            '${state.totalItems} in total.',
+                            textAlign: TextAlign.center,
+                            style: DiscoveryText.fine,
+                          ),
+                        ),
+                    ],
+                  ),
           ),
         ],
       ),
+    );
+  }
+
+  /// What went wrong, and the way out of it. Being offline and the server
+  /// faulting read differently: one is the seeker's to act on, the other
+  /// explicitly is not.
+  Widget _error(BuildContext context, NotificationState state) {
+    final isOffline = state.isOffline;
+
+    return ErrorState(
+      isOffline: isOffline,
+      title: isOffline ? 'You are offline' : "Couldn't load notifications",
+      body: isOffline
+          ? 'Nothing loaded because there is no connection. They will be '
+                'here when you are back.'
+          : 'Something went wrong on our side, not yours. Nothing you did '
+                'was lost.',
+      onRetry: () =>
+          context.read<NotificationBloc>().add(const NotificationsRequested()),
+      reference: isOffline ? null : state.failure?.errorCode,
+      occurredAt: isOffline ? null : state.failedAt,
     );
   }
 }
@@ -192,7 +303,7 @@ class NotificationRow extends StatelessWidget {
                           children: [
                             Text(
                               notification.title,
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: DiscoveryText.reviewAuthor.copyWith(
                                 height: 18 / 13.5,
@@ -201,7 +312,13 @@ class NotificationRow extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               notification.body,
-                              maxLines: 1,
+                              // Two lines, because the server puts what to
+                              // do next at the end of the sentence: at one
+                              // line "We could not find anyone for
+                              // VISFDSY04M5. Try booking a time instead."
+                              // reached the seeker as "… Try boo…", which is
+                              // the half that mattered.
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: DiscoveryText.meta.copyWith(
                                 height: 15 / 11.5,
@@ -283,6 +400,13 @@ class _KindMark extends StatelessWidget {
         AppColor.artAmberLight,
         AppColor.artAmberDeep,
         Icons.info_outline_rounded,
+      ),
+      // Something did not come good — nobody took the job, a visit fell
+      // through. It wears the same red the app uses for a refusal.
+      NotificationKind.problem => (
+        AppColor.stockLowTint,
+        AppColor.authError,
+        Icons.priority_high_rounded,
       ),
     };
 

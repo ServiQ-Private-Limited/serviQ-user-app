@@ -78,6 +78,16 @@ class AuthSession {
 
   bool get isAuthenticated => _tokens != null;
 
+  /// A refresh token survived a launch that could not spend it — the network
+  /// was down rather than the credential being refused.
+  ///
+  /// The session is not signed in, but it is not signed out either: it is
+  /// one successful refresh away, which is what [refreshIfNeeded] will try
+  /// the next time anything asks for the network.
+  bool get hasStoredCredential => _storedRefreshToken != null;
+
+  String? _storedRefreshToken;
+
   bool get needsRefresh => _tokens?.isAccessTokenExpired ?? false;
 
   /// Runs the launch lifecycle: read the stored refresh token, and if there is
@@ -87,6 +97,7 @@ class AuthSession {
     if (stored == null) return AuthBootstrapResult.noSession;
 
     _user = stored.user;
+    _storedRefreshToken = stored.refreshToken;
     if (await _refresh(stored.refreshToken)) {
       return AuthBootstrapResult.signedIn;
     }
@@ -106,7 +117,10 @@ class AuthSession {
     final existing = _inFlightRefresh;
     if (existing != null) return existing;
 
-    final refreshToken = _tokens?.refreshToken;
+    // Falls back to the token on disk, so a session the launch could not
+    // revive because the network was down comes back on the first request
+    // that succeeds — rather than the seeker having to restart the app.
+    final refreshToken = _tokens?.refreshToken ?? _storedRefreshToken;
     if (refreshToken == null) return Future.value(false);
     return _refresh(refreshToken);
   }
@@ -141,6 +155,7 @@ class AuthSession {
       (tokens) async {
         _lastRefreshWasTransportFailure = false;
         _tokens = tokens;
+        _storedRefreshToken = tokens.refreshToken;
         // The server has already rotated the token, so the old one is spent.
         // Persist the replacement before anything can use it — a crash between
         // these two lines would otherwise leave a token on disk that the next
@@ -199,6 +214,7 @@ class AuthSession {
   Future<void> clear() async {
     _tokens = null;
     _user = null;
+    _storedRefreshToken = null;
     await store.clear();
   }
 }
@@ -222,7 +238,13 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    if (!authEndpointPaths.contains(options.path) && session.needsRefresh) {
+    final isAuthEndpoint = authEndpointPaths.contains(options.path);
+    // A session that could not be revived at launch — the app opened with no
+    // signal — is revived here instead, on the first request made once there
+    // is a network again.
+    final needsReviving =
+        !session.isAuthenticated && session.hasStoredCredential;
+    if (!isAuthEndpoint && (session.needsRefresh || needsReviving)) {
       // Single-flight inside AuthSession, so several requests waking together
       // after expiry share one refresh rather than racing to spend the token.
       await session.refreshIfNeeded();

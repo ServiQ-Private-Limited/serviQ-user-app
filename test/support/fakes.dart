@@ -77,14 +77,19 @@ class FakeLoginRepository implements LoginRepository {
   Failure? logoutAllFailure;
 
   /// Tokens handed back on success, in order.
-  final List<AuthTokens> responses;
-  final Failure? failure;
+  ///
+  /// Mutable, so a test can script a repository that fails while the network
+  /// is down and then answers when it comes back.
+  List<AuthTokens> responses;
+  Failure? failure;
 
   /// Awaited before each refresh returns, letting a test hold two calls in
   /// flight at once.
   Future<void>? gate;
 
   FakeLoginRepository({this.responses = const [], this.failure});
+
+  int _answered = 0;
 
   @override
   Future<Either<Failure, AuthTokens>> refreshTokens({
@@ -96,10 +101,12 @@ class FakeLoginRepository implements LoginRepository {
     final pending = gate;
     if (pending != null) await pending;
     if (failure != null) return Left(failure!);
-    if (refreshCalls.length > responses.length) {
+    // Counted separately from the calls, so a failed attempt does not eat a
+    // scripted success.
+    if (_answered >= responses.length) {
       return const Left(Failure(errorMessage: 'no scripted response'));
     }
-    return Right(responses[refreshCalls.length - 1]);
+    return Right(responses[_answered++]);
   }
 
   @override
