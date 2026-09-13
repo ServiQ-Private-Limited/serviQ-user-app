@@ -42,3 +42,14 @@ final class SearchRatingCycled extends SearchEvent {
   @override
   List<Object> get props => [];
 }
+
+/// The trade and the rating floor together, as the filter sheet returns them.
+final class SearchFiltersApplied extends SearchEvent {
+  final String? trade;
+  final double? minRating;
+
+  const SearchFiltersApplied({this.trade, this.minRating});
+
+  @override
+  List<Object?> get props => [trade, minRating];
+}

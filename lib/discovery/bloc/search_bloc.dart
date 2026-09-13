@@ -21,10 +21,11 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     on<SearchQueryChanged>(_onQueryChanged);
     on<SearchTradeSelected>(_onTradeSelected);
     on<SearchRatingCycled>(_onRatingCycled);
+    on<SearchFiltersApplied>(_onFiltersApplied);
   }
 
-  /// The rating floors the scope chip steps through.
-  static const _ratingSteps = <double?>[null, 4.0, 4.5];
+  /// The rating floors on offer, and the order the sheet lists them in.
+  static const ratingSteps = <double?>[null, 4.0, 4.5];
 
   void _onOpened(SearchOpened event, Emitter<SearchState> emit) {
     emit(
@@ -48,11 +49,28 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     _search(emit);
   }
 
+  /// Both scopes at once, which is what the sheet hands back — a seeker who
+  /// sets a trade and a rating together should see one new list, not two.
+  void _onFiltersApplied(
+    SearchFiltersApplied event,
+    Emitter<SearchState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        trade: event.trade,
+        clearTradeWhenAll: true,
+        minRating: event.minRating,
+        clearRatingWhenAny: true,
+      ),
+    );
+    _search(emit);
+  }
+
   void _onRatingCycled(SearchRatingCycled event, Emitter<SearchState> emit) {
     final next =
-        (_ratingSteps.indexOf(state.minRating) + 1) % _ratingSteps.length;
+        (ratingSteps.indexOf(state.minRating) + 1) % ratingSteps.length;
     emit(
-      state.copyWith(minRating: _ratingSteps[next], clearRatingWhenAny: true),
+      state.copyWith(minRating: ratingSteps[next], clearRatingWhenAny: true),
     );
     _search(emit);
   }

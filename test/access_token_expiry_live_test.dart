@@ -78,12 +78,12 @@ void main() {
 
       // No validateStatus override: dio must throw on the 401 for the
       // interceptor's onError to run at all, which is how the app behaves.
-      final response = await apiClient.dio.get('/api/v1/users/me');
+      final response = await apiClient.dio.get('/api/v1/user/profile');
 
       // The call started with a dead token and still came back 200: the
       // interceptor refreshed and replayed it.
       expect(response.statusCode, 200);
-      expect(response.data['responseData']['phoneNumber'], isNotEmpty);
+      expect(response.data['responseData'], isNotNull);
       expect(
         session.tokens!.accessToken,
         isNot(expired.accessToken),

@@ -78,6 +78,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     HomeRequested event,
     Emitter<HomeState> emit,
   ) async {
+    // No area yet — the shell is still reading the stored profile. Asking
+    // with an empty slug is worse than not asking: the server answers it
+    // with whichever area it defaults to, and home would show somebody
+    // else's providers for the moment before the real one arrives.
+    if (event.localitySlug.trim().isEmpty) return;
+
     emit(
       state.copyWith(
         localitySlug: event.localitySlug,

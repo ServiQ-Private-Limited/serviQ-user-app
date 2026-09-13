@@ -100,6 +100,42 @@ Future<void> pumpHome(WidgetTester tester, FakeHomeSource source) async {
 void main() {
   setUpAll(loadFonts);
 
+  group('before an area is known', () {
+    testWidgets('home asks for nothing until it has one', (tester) async {
+      final source = FakeHomeSource();
+      tester.view.physicalSize = const Size(390 * 3, 900 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(useMaterial3: true, fontFamily: 'Mulish'),
+          home: Scaffold(
+            body: SafeArea(
+              bottom: false,
+              child: DiscoveryHomeView(
+                // What the shell holds while it reads the stored profile.
+                localityName: 'Choose your area',
+                localitySlug: '',
+                homeRepository: source,
+                onChangeLocality: () {},
+                onSearch: () {},
+                onSeeAllCategories: (_) {},
+                onSeeAllProviders: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 3));
+
+      // An empty slug is not a question worth asking: the server answers it
+      // with whichever area it defaults to, which is somebody else's.
+      expect(source.requested, isEmpty);
+      expect(find.byType(SkeletonList), findsOneWidget);
+    });
+  });
+
   group('the payload', () {
     test('parses the shape the endpoint sends', () {
       final feed = HomeFeed.fromJson(Map<String, dynamic>.from(_payload));

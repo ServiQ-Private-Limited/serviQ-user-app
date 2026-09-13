@@ -62,6 +62,10 @@ class SearchState extends Equatable {
     );
   }
 
+  /// Whether anything is narrowing the list. The icon fills on this, since
+  /// there are no chips left to say so.
+  bool get isFiltered => trade != null || minRating != null;
+
   /// Nothing matched something that was actually asked for — an empty query
   /// returning nothing is not a dead end, it is a screen waiting to be used.
   bool get hasNoMatches => results.isEmpty && query.trim().isNotEmpty;

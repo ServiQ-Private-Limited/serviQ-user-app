@@ -10,6 +10,7 @@ import 'package:local_markerplace/basket/basket.dart';
 import 'package:local_markerplace/discovery/model/catalogue_service.dart';
 import 'package:local_markerplace/discovery/model/service_category.dart';
 import 'package:local_markerplace/discovery/presentation/components/category_filter_sheet.dart';
+import 'package:local_markerplace/discovery/presentation/components/filter_button.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_header.dart';
 import 'package:local_markerplace/discovery/presentation/components/pending_booking_bar.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_text.dart';
@@ -157,7 +158,7 @@ class _ServicesViewState extends State<_ServicesView> {
                 // reads as narrowed rather than as an empty area.
                 ?state.category,
               ].join(' · '),
-              trailing: _FilterButton(
+              trailing: FilterButton(
                 isFiltered: state.category != null,
                 onTap: _openFilter,
               ),
@@ -428,42 +429,4 @@ String _initials(String name) {
   if (words.isEmpty || words.first.isEmpty) return '?';
   if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
-}
-
-/// The header's filter affordance. It fills with the accent once a category
-/// is on, so the seeker can tell a short list from a narrowed one without
-/// reading the chips.
-class _FilterButton extends StatelessWidget {
-  const _FilterButton({required this.isFiltered, required this.onTap});
-
-  final bool isFiltered;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      pressedScale: 0.9,
-      child: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isFiltered ? AppColor.discoveryAccent : AppColor.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isFiltered
-                ? AppColor.discoveryAccent
-                : AppColor.discoveryBorder,
-            width: 1.4,
-          ),
-        ),
-        child: Icon(
-          Icons.tune_rounded,
-          size: 19,
-          color: isFiltered ? AppColor.white : AppColor.discoveryTextSecondary,
-        ),
-      ),
-    );
-  }
 }

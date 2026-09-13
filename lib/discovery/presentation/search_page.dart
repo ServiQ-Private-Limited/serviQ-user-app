@@ -10,7 +10,8 @@ import 'package:local_markerplace/core/app_color.dart';
 import 'package:local_markerplace/discovery/bloc/search_bloc.dart';
 import 'package:local_markerplace/discovery/model/provider_summary.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_assets.dart';
-import 'package:local_markerplace/discovery/presentation/components/discovery_filter_chip.dart';
+import 'package:local_markerplace/discovery/presentation/components/filter_button.dart';
+import 'package:local_markerplace/discovery/presentation/components/search_filter_sheet.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_search_field.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_tab_bar.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_text.dart';
@@ -107,10 +108,40 @@ class _SearchViewState extends State<_SearchView> {
   void _query(String value) =>
       context.read<SearchBloc>().add(SearchQueryChanged(value));
 
+  /// True while the sheet is up, so a second tap cannot stack another on it.
+  bool _filterIsOpen = false;
+
+  Future<void> _openFilters(BuildContext context, SearchState state) async {
+    if (_filterIsOpen) return;
+    _filterIsOpen = true;
+    final bloc = context.read<SearchBloc>();
+    final chosen = await SearchFilterSheet.show(
+      context,
+      trades: state.trades,
+      ratings: SearchBloc.ratingSteps,
+      localityName: state.localityName,
+      trade: state.trade,
+      minRating: state.minRating,
+    );
+    _filterIsOpen = false;
+    // Dismissing changes nothing, which is why a null answer is not read as
+    // "clear everything".
+    if (chosen == null || !context.mounted) return;
+
+    if (chosen.changeArea) {
+      // Changing the area is the area picker's job, so this hands the screen
+      // back rather than filtering in place.
+      await Navigator.of(context).maybePop();
+      return;
+    }
+    bloc.add(
+      SearchFiltersApplied(trade: chosen.trade, minRating: chosen.minRating),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<SearchBloc>().state;
-    final trades = state.trades;
     final results = state.results;
 
     return Scaffold(
@@ -136,57 +167,10 @@ class _SearchViewState extends State<_SearchView> {
                       },
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  DiscoveryFilterChip(
-                    label: 'All',
-                    isSelected: state.trade == null,
-                    onTap: () => context.read<SearchBloc>().add(
-                      const SearchTradeSelected(null),
-                    ),
-                  ),
-                  for (final trade in trades) ...[
-                    const SizedBox(width: 8),
-                    DiscoveryFilterChip(
-                      label: trade,
-                      isSelected: state.trade == trade,
-                      onTap: () => context.read<SearchBloc>().add(
-                        SearchTradeSelected(trade),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  DiscoveryFilterChip(
-                    label: state.localityName,
-                    hasCaret: true,
-                    // Changing the area is the area picker's job, so this
-                    // hands the screen back rather than filtering in place.
-                    onTap: () => Navigator.of(context).maybePop(),
-                  ),
-                  const SizedBox(width: 8),
-                  DiscoveryFilterChip(
-                    label: state.ratingLabel,
-                    hasCaret: true,
-                    onTap: () => context.read<SearchBloc>().add(
-                      const SearchRatingCycled(),
-                    ),
+                  const SizedBox(width: 10),
+                  FilterButton(
+                    isFiltered: state.isFiltered,
+                    onTap: () => _openFilters(context, state),
                   ),
                 ],
               ),
@@ -211,9 +195,15 @@ class _SearchViewState extends State<_SearchView> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Text(
-                  '${results.length} '
-                  '${results.length == 1 ? 'result' : 'results'} '
-                  'in ${state.localityName}',
+                  [
+                    '${results.length} '
+                        '${results.length == 1 ? 'result' : 'results'} '
+                        'in ${state.localityName}',
+                    // Says which filters produced that count, since the
+                    // chips that used to show them are gone.
+                    ?state.trade,
+                    if (state.minRating != null) state.ratingLabel,
+                  ].join(' · '),
                   style: DiscoveryText.footnoteStrong,
                 ),
               ),
