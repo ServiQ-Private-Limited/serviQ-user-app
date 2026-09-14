@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:local_markerplace/visit/model/visit.dart';
 import 'package:local_markerplace/visit/model/visit_mode.dart';
 import 'package:local_markerplace/visit/model/visit_slot.dart';
+import 'package:local_markerplace/me/model/saved_address.dart';
 import 'package:local_markerplace/visit/repository/visit_repository.dart';
 
 part 'visit_event.dart';
@@ -25,6 +26,7 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
     on<CartRefreshed>(_onCartRefreshed);
     on<CartModeSelected>(_onModeSelected);
     on<CartSlotChosen>(_onSlotChosen);
+    on<CartAddressChosen>(_onAddressChosen);
     on<CartPaymentChosen>(_onPaymentChosen);
     on<ServiceQuantityChanged>(_onServiceQuantityChanged);
     on<PartQuantityChanged>(_onPartQuantityChanged);
@@ -76,6 +78,18 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
   void _onSlotChosen(CartSlotChosen event, Emitter<VisitState> emit) {
     visitRepository.setSlot(state.providerName, event.slot);
     emit(state.copyWith(cart: _cart()));
+  }
+
+  /// Where the provider is being sent. Chosen from the seeker's saved
+  /// addresses, so the cart carries one they can actually be found at.
+  void _onAddressChosen(
+    CartAddressChosen event,
+    Emitter<VisitState> emit,
+  ) {
+    final providerName = state.providerName;
+    if (providerName.isEmpty) return;
+    visitRepository.setAddress(providerName, event.address);
+    emit(state.copyWith(cart: visitRepository.cartFor(providerName)));
   }
 
   void _onPaymentChosen(CartPaymentChosen event, Emitter<VisitState> emit) {

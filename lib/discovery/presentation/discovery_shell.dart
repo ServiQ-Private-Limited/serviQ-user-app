@@ -413,6 +413,10 @@ class _DiscoveryShellViewState extends State<_DiscoveryShellView> {
       ),
       onAddresses: () => _push(
         AddressesPage(
+          // A new address is filed under the area already chosen: the
+          // endpoint refuses a slug it does not know, and this is the area
+          // that decides which providers the seeker sees.
+          localityName: _localityName ?? account.localityName,
           onTabSelected: _selectTabFromChild,
           onPost: _openPostForm,
         ),

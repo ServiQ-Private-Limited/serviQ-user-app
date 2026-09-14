@@ -14,6 +14,7 @@ import 'package:local_markerplace/visit/presentation/components/cart_bits.dart';
 import 'package:local_markerplace/visit/presentation/components/slot_sheet.dart';
 import 'package:local_markerplace/visit/presentation/components/visit_bits.dart';
 import 'package:local_markerplace/visit/presentation/confirm_visit_page.dart';
+import 'package:local_markerplace/me/presentation/choose_address_sheet.dart';
 import 'package:local_markerplace/visit/repository/visit_repository.dart';
 
 /// My Cart — everything the seeker has put aside, and how it gets timed.
@@ -27,6 +28,7 @@ class YourVisitPage extends StatelessWidget {
     super.key,
     required this.providerName,
     this.repository,
+    this.localityName,
     this.onAddAnother,
   });
 
@@ -35,6 +37,9 @@ class YourVisitPage extends StatelessWidget {
   final String providerName;
 
   final VisitRepository? repository;
+
+  /// The area a newly added address is filed under.
+  final String? localityName;
 
   /// Sends the seeker back to the provider's services. Null where there is
   /// nowhere obvious to go, and then the link is left off.
@@ -46,15 +51,24 @@ class YourVisitPage extends StatelessWidget {
       create: (_) =>
           VisitBloc(visitRepository: repository ?? VisitRepository.shared)
             ..add(CartOpened(providerName)),
-      child: _YourVisitView(onAddAnother: onAddAnother),
+      child: _YourVisitView(
+        onAddAnother: onAddAnother,
+        localityName: localityName,
+      ),
     );
   }
 }
 
 class _YourVisitView extends StatefulWidget {
-  const _YourVisitView({required this.onAddAnother});
+  const _YourVisitView({
+    required this.onAddAnother,
+    required this.localityName,
+  });
 
   final VoidCallback? onAddAnother;
+
+  /// The area a newly added address is filed under.
+  final String? localityName;
 
   @override
   State<_YourVisitView> createState() => _YourVisitViewState();
@@ -94,6 +108,7 @@ class _YourVisitViewState extends State<_YourVisitView> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ConfirmVisitPage(
+          localityName: widget.localityName,
           providerName: state.providerName,
           repository: bloc.visitRepository,
         ),
@@ -101,6 +116,21 @@ class _YourVisitViewState extends State<_YourVisitView> {
     );
     // Confirming empties the cart, so what is left is read again.
     bloc.add(const CartRefreshed());
+  }
+
+  /// Picks a different saved address for this cart.
+  ///
+  /// The sheet also offers adding one, which is the way out for a seeker who
+  /// has none — the row they tapped says so, and this is what it leads to.
+  Future<void> _changeAddress() async {
+    final bloc = _bloc;
+    final chosen = await chooseAddress(
+      context,
+      localityName: widget.localityName,
+      currentId: _state.cart?.addressId,
+    );
+    if (chosen == null) return;
+    bloc.add(CartAddressChosen(chosen));
   }
 
   void _notice(String message) {
@@ -289,7 +319,7 @@ class _YourVisitViewState extends State<_YourVisitView> {
             icon: Icons.place_outlined,
             title: 'Location',
             subtitle: visit.addressSubtitle,
-            onTap: () => _notice('Changing the address — coming soon.'),
+            onTap: _changeAddress,
           ),
           const CartDivider(),
           CartDetailRow(

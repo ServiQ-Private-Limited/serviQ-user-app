@@ -152,6 +152,7 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
       MaterialPageRoute(
         builder: (_) => YourVisitPage(
           providerName: _profile.name,
+          localityName: _bloc.state.localityName,
           onAddAnother: () => Navigator.of(context).pop(),
         ),
       ),

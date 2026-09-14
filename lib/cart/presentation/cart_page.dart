@@ -14,6 +14,7 @@ import 'package:local_markerplace/cart/presentation/components/mode_unavailable_
 import 'package:local_markerplace/cart/presentation/components/review_booking_card.dart';
 import 'package:local_markerplace/cart/presentation/components/time_slot_sheet.dart';
 import 'package:local_markerplace/cart/repository/cart_repository.dart';
+import 'package:local_markerplace/me/presentation/choose_address_sheet.dart';
 import 'package:local_markerplace/components/primary_button.dart';
 import 'package:local_markerplace/core/app_color.dart';
 import 'package:local_markerplace/dashboard/model/services.dart';
@@ -21,25 +22,31 @@ import 'package:local_markerplace/dashboard/model/services.dart';
 /// "My Cart": the services the customer picked, how they want them delivered,
 /// and what it costs.
 class CartPage extends StatelessWidget {
-  const CartPage({super.key, this.services = const []});
+  const CartPage({super.key, this.services = const [], this.localityName});
 
   /// Services selected on the dashboard. Empty on a deep link, which simply
   /// yields an empty cart.
   final List<ServiceDetails> services;
 
+  /// The area a newly added address is filed under.
+  final String? localityName;
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => CartBloc(cartRepository: const CartRepository()),
-      child: _CartView(services: services),
+      child: _CartView(services: services, localityName: localityName),
     );
   }
 }
 
 class _CartView extends StatefulWidget {
-  const _CartView({required this.services});
+  const _CartView({required this.services, this.localityName});
 
   final List<ServiceDetails> services;
+
+  /// The area a newly added address is filed under.
+  final String? localityName;
 
   @override
   State<_CartView> createState() => _CartViewState();
@@ -112,6 +119,7 @@ class _CartViewState extends State<_CartView> {
             state: state,
             onComingSoon: _showComingSoon,
             onRemoveItem: _removeItem,
+            localityName: widget.localityName,
           );
         },
       ),
@@ -132,10 +140,25 @@ class _CartBody extends StatelessWidget {
     required this.state,
     required this.onComingSoon,
     required this.onRemoveItem,
+    this.localityName,
   });
 
   final CartState state;
   final ValueChanged<String> onComingSoon;
+
+  /// The area a newly added address is filed under.
+  final String? localityName;
+
+  /// Picks a different saved address for this booking, or adds one.
+  Future<void> _changeAddress(BuildContext context) async {
+    final bloc = context.read<CartBloc>();
+    final chosen = await chooseAddress(
+      context,
+      localityName: localityName,
+    );
+    if (chosen == null) return;
+    bloc.add(OnChangeAddress(chosen));
+  }
 
   /// Removal is handled by the page, which owns the cart's bloc.
   final ValueChanged<CartItem> onRemoveItem;
@@ -189,8 +212,7 @@ class _CartBody extends StatelessWidget {
                   : null,
               onChangeSlot: () =>
                   showTimeSlotSheet(context, context.read<CartBloc>()),
-              onEditAddress: () =>
-                  onComingSoon('Editing the address is not available yet.'),
+              onEditAddress: () => _changeAddress(context),
               onEditContact: () =>
                   onComingSoon('Editing the contact is not available yet.'),
             ),

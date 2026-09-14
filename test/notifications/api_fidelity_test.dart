@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,13 +22,7 @@ void main() {
   late List<Map<String, dynamic>> items;
 
   setUp(() {
-    final raw =
-        jsonDecode(
-              File(
-                'test/fixtures/notifications_page0.json',
-              ).readAsStringSync(),
-            )
-            as Map<String, dynamic>;
+    final raw = jsonDecode(capturedNotificationsPage) as Map<String, dynamic>;
     payload = raw['responseData'] as Map<String, dynamic>;
     items = [
       for (final entry in payload['items'] as List)
@@ -166,3 +159,247 @@ void main() {
     );
   });
 }
+
+/// One page of `/api/v1/user/notifications`, captured off the live endpoint.
+///
+/// Kept here rather than in a fixtures directory on purpose: a file beside
+/// the test is one more thing to remember to commit, and when it goes missing
+/// every test in this file fails on a path rather than on the thing it is
+/// checking.
+const capturedNotificationsPage = r'''
+{
+  "responseCode": "200 OK",
+  "errorCode": null,
+  "responseMessage": "Success",
+  "responseTime": "2026-09-13T11:15:36.373242395Z",
+  "responseData": {
+    "items": [
+      {
+        "id": 577,
+        "kind": "DISPATCH_NO_PARTNER",
+        "title": "No one was available",
+        "body": "We could not find anyone for VISFDSY04M5. Try booking a time instead.",
+        "entityType": "VISIT",
+        "entityId": 338,
+        "entityCode": "VISFDSY04M5",
+        "read": false,
+        "createdAt": "2026-09-12T09:44:52.091235"
+      },
+      {
+        "id": 574,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Plumbers is on the job",
+        "body": "Your request VISLZH85DGV is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 337,
+        "entityCode": "VISLZH85DGV",
+        "read": false,
+        "createdAt": "2026-09-12T09:44:49.594036"
+      },
+      {
+        "id": 571,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Electricals is on the job",
+        "body": "Your request VISTJG4UVQV is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 336,
+        "entityCode": "VISTJG4UVQV",
+        "read": false,
+        "createdAt": "2026-09-12T09:44:43.179637"
+      },
+      {
+        "id": 528,
+        "kind": "DISPATCH_NO_PARTNER",
+        "title": "No one was available",
+        "body": "We could not find anyone for VISLFZHZO98. Try booking a time instead.",
+        "entityType": "VISIT",
+        "entityId": 325,
+        "entityCode": "VISLFZHZO98",
+        "read": false,
+        "createdAt": "2026-09-12T09:34:30.547435"
+      },
+      {
+        "id": 525,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Plumbers is on the job",
+        "body": "Your request VIS8SSOV8T1 is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 324,
+        "entityCode": "VIS8SSOV8T1",
+        "read": false,
+        "createdAt": "2026-09-12T09:34:28.06827"
+      },
+      {
+        "id": 522,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Electricals is on the job",
+        "body": "Your request VIS9S4046BB is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 323,
+        "entityCode": "VIS9S4046BB",
+        "read": false,
+        "createdAt": "2026-09-12T09:34:21.878919"
+      },
+      {
+        "id": 510,
+        "kind": "DISPATCH_NO_PARTNER",
+        "title": "No one was available",
+        "body": "We could not find anyone for VISUZ1RH7OO. Try booking a time instead.",
+        "entityType": "VISIT",
+        "entityId": 321,
+        "entityCode": "VISUZ1RH7OO",
+        "read": false,
+        "createdAt": "2026-09-12T09:26:44.093906"
+      },
+      {
+        "id": 507,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Plumbers is on the job",
+        "body": "Your request VIS7US0WTPF is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 320,
+        "entityCode": "VIS7US0WTPF",
+        "read": false,
+        "createdAt": "2026-09-12T09:26:41.630033"
+      },
+      {
+        "id": 504,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Electricals is on the job",
+        "body": "Your request VISJ80OD0O2 is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 319,
+        "entityCode": "VISJ80OD0O2",
+        "read": false,
+        "createdAt": "2026-09-12T09:26:35.245542"
+      },
+      {
+        "id": 492,
+        "kind": "DISPATCH_NO_PARTNER",
+        "title": "No one was available",
+        "body": "We could not find anyone for VISAMU5N6E2. Try booking a time instead.",
+        "entityType": "VISIT",
+        "entityId": 317,
+        "entityCode": "VISAMU5N6E2",
+        "read": false,
+        "createdAt": "2026-09-12T08:36:26.512619"
+      },
+      {
+        "id": 489,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Plumbers is on the job",
+        "body": "Your request VIS0095YZA1 is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 316,
+        "entityCode": "VIS0095YZA1",
+        "read": false,
+        "createdAt": "2026-09-12T08:36:24.074516"
+      },
+      {
+        "id": 486,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Electricals is on the job",
+        "body": "Your request VIS9KSK7KX9 is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 315,
+        "entityCode": "VIS9KSK7KX9",
+        "read": false,
+        "createdAt": "2026-09-12T08:36:17.745269"
+      },
+      {
+        "id": 474,
+        "kind": "DISPATCH_NO_PARTNER",
+        "title": "No one was available",
+        "body": "We could not find anyone for VIS9O35LAJJ. Try booking a time instead.",
+        "entityType": "VISIT",
+        "entityId": 313,
+        "entityCode": "VIS9O35LAJJ",
+        "read": false,
+        "createdAt": "2026-09-12T08:29:38.36271"
+      },
+      {
+        "id": 471,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Plumbers is on the job",
+        "body": "Your request VISDZGMT5QM is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 312,
+        "entityCode": "VISDZGMT5QM",
+        "read": false,
+        "createdAt": "2026-09-12T08:29:35.792855"
+      },
+      {
+        "id": 468,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Electricals is on the job",
+        "body": "Your request VISNXQI7ZJ0 is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 311,
+        "entityCode": "VISNXQI7ZJ0",
+        "read": false,
+        "createdAt": "2026-09-12T08:29:29.086855"
+      },
+      {
+        "id": 456,
+        "kind": "DISPATCH_NO_PARTNER",
+        "title": "No one was available",
+        "body": "We could not find anyone for VISQ5ZSTYWZ. Try booking a time instead.",
+        "entityType": "VISIT",
+        "entityId": 309,
+        "entityCode": "VISQ5ZSTYWZ",
+        "read": false,
+        "createdAt": "2026-09-09T12:34:04.418141"
+      },
+      {
+        "id": 453,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Plumbers is on the job",
+        "body": "Your request VISS2K2X3G5 is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 308,
+        "entityCode": "VISS2K2X3G5",
+        "read": false,
+        "createdAt": "2026-09-09T12:34:01.888388"
+      },
+      {
+        "id": 450,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Electricals is on the job",
+        "body": "Your request VIS4S1ZRAKV is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 307,
+        "entityCode": "VIS4S1ZRAKV",
+        "read": false,
+        "createdAt": "2026-09-09T12:33:55.363172"
+      },
+      {
+        "id": 438,
+        "kind": "DISPATCH_NO_PARTNER",
+        "title": "No one was available",
+        "body": "We could not find anyone for VISGEUU57CG. Try booking a time instead.",
+        "entityType": "VISIT",
+        "entityId": 305,
+        "entityCode": "VISGEUU57CG",
+        "read": false,
+        "createdAt": "2026-09-09T12:07:22.973981"
+      },
+      {
+        "id": 435,
+        "kind": "VISIT_CONFIRMED",
+        "title": "Dev Plumbers is on the job",
+        "body": "Your request VIS8FQM0YPR is confirmed.",
+        "entityType": "VISIT",
+        "entityId": 304,
+        "entityCode": "VIS8FQM0YPR",
+        "read": false,
+        "createdAt": "2026-09-09T12:07:20.487792"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 46,
+    "totalPages": 3,
+    "hasNext": true
+  }
+}
+''';

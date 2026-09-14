@@ -52,6 +52,15 @@ final class OnSelectSlot extends CartEvent {
   List<Object> get props => [slot];
 }
 
+final class OnChangeAddress extends CartEvent {
+  final SavedAddress address;
+
+  const OnChangeAddress(this.address);
+
+  @override
+  List<Object> get props => [address];
+}
+
 final class OnToggleBillDetails extends CartEvent {
   const OnToggleBillDetails();
 

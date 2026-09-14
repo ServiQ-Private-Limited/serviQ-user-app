@@ -40,6 +40,15 @@ final class CartSlotChosen extends VisitEvent {
   List<Object> get props => [slot];
 }
 
+final class CartAddressChosen extends VisitEvent {
+  const CartAddressChosen(this.address);
+
+  final SavedAddress address;
+
+  @override
+  List<Object?> get props => [address];
+}
+
 final class CartPaymentChosen extends VisitEvent {
   final VisitPayment payment;
 

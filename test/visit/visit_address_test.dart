@@ -6,6 +6,8 @@ import 'package:local_markerplace/visit/model/visit.dart';
 import 'package:local_markerplace/visit/model/visit_service.dart';
 import 'package:local_markerplace/visit/repository/visit_repository.dart';
 
+import '../support/fake_address_repository.dart';
+
 /// Where a booking is going.
 ///
 /// Five screens show an address — confirming a visit, the receipt, My orders,
@@ -57,11 +59,13 @@ void main() {
   test('an absent address is said, not filled in', () {
     const visit = Visit(providerName: 'Dev Electricals', providerLine: 'x');
 
-    expect(visit.addressTitle, 'No address saved');
-    expect(visit.addressSummary, 'No address saved');
+    // "Chosen", not "saved": an account can have three addresses and no
+    // default, and the app must not pick one on the seeker's behalf.
+    expect(visit.addressTitle, 'No address chosen');
+    expect(visit.addressSummary, 'No address chosen');
     expect(
       visit.addressSubtitle,
-      'Add one so the provider knows where to come.',
+      'Choose where the provider should come.',
     );
     expectNothingInvented(visit.addressSubtitle);
   });
@@ -91,9 +95,75 @@ void main() {
     ) {
       expectNothingInvented(details.address);
       if (!details.hasAddress) {
-        expect(details.addressTitle, 'No address saved');
+        expect(details.addressTitle, 'No address chosen');
       }
     });
+  });
+
+  test('the address on a cart can be changed', () {
+    final repository = VisitRepository();
+    repository.addService(
+      providerName: 'Dev Electricals',
+      providerLine: 'Galleria Market 1',
+      service: const VisitService(
+        name: 'Fan repair',
+        detail: 'Diagnosis and fix',
+        unitPrice: 300,
+      ),
+    );
+
+    repository.setAddress(
+      'Dev Electricals',
+      sampleAddress(id: 42, label: 'Office', line1: 'Unit 12'),
+    );
+    final cart = repository.cartFor('Dev Electricals')!;
+
+    expect(cart.hasAddress, isTrue);
+    expect(cart.addressId, 42, reason: 'the picker marks the current one');
+    expect(cart.addressTitle, 'Office');
+    expect(cart.addressLine, 'Unit 12, Galleria Market 1, 201016');
+    expectNothingInvented(cart.addressLine);
+  });
+
+  test('changing it again replaces it rather than stacking up', () {
+    final repository = VisitRepository();
+    repository.addService(
+      providerName: 'Dev Electricals',
+      providerLine: 'Galleria Market 1',
+      service: const VisitService(
+        name: 'Fan repair',
+        detail: 'Diagnosis and fix',
+        unitPrice: 300,
+      ),
+    );
+
+    repository.setAddress('Dev Electricals', sampleAddress(id: 1, label: 'A'));
+    repository.setAddress('Dev Electricals', sampleAddress(id: 2, label: 'B'));
+
+    expect(repository.cartFor('Dev Electricals')!.addressId, 2);
+    expect(repository.cartFor('Dev Electricals')!.addressTitle, 'B');
+  });
+
+  test('a booked visit keeps the address it was booked with', () {
+    final repository = VisitRepository();
+    repository.addService(
+      providerName: 'Dev Electricals',
+      providerLine: 'Galleria Market 1',
+      service: const VisitService(
+        name: 'Fan repair',
+        detail: 'Diagnosis and fix',
+        unitPrice: 300,
+      ),
+    );
+    repository.setAddress(
+      'Dev Electricals',
+      sampleAddress(id: 7, label: 'Home', line1: 'A-1'),
+    );
+
+    final booked = repository.confirm('Dev Electricals');
+
+    expect(booked.addressId, 7);
+    expect(booked.addressSummary, 'A-1, Galleria Market 1, 201016 · Home');
   });
 
   test('the default is the one a booking would use', () {

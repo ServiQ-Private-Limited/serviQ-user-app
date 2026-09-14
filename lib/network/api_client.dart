@@ -151,5 +151,39 @@ class APIClient {
     }
   }
 
+  Future<dynamic> patch(
+    String uri, {
+    Map<String, dynamic>? queryParameters,
+    dynamic data,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await dio.patch(
+      uri,
+      queryParameters: queryParameters,
+      data: data,
+      options: options,
+      cancelToken: cancelToken,
+    );
+    return response.data;
+  }
+
+  Future<dynamic> delete(
+    String uri, {
+    Map<String, dynamic>? queryParameters,
+    dynamic data,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await dio.delete(
+      uri,
+      queryParameters: queryParameters,
+      data: data,
+      options: options,
+      cancelToken: cancelToken,
+    );
+    return response.data;
+  }
+
   // Removed the public constructor as we now use the factory constructor and internal constructor.
 }

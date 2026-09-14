@@ -35,6 +35,7 @@ class Visit extends Equatable {
     this.parts = const [],
     this.mode,
     this.slot,
+    this.addressId,
     this.addressLabel,
     this.addressLine,
     this.contactName = 'Test Seeker',
@@ -70,6 +71,10 @@ class Visit extends Equatable {
   /// printing an address nobody lives at. It used to default to a written-in
   /// "Tower B, Flat 1204, Crossings Republik", which every booking then
   /// showed regardless of whose account it was.
+  /// Which saved address this is, so the picker can mark the one the
+  /// booking is already on.
+  final int? addressId;
+
   final String? addressLabel;
   final String? addressLine;
 
@@ -82,17 +87,21 @@ class Visit extends Equatable {
   /// as far as a booking without noticing that nobody knows where to come.
   String get addressTitle => hasAddress
       ? (addressLabel?.isNotEmpty == true ? addressLabel! : 'Your address')
-      : 'No address saved';
+      : 'No address chosen';
 
-  String get addressSubtitle =>
-      hasAddress ? addressLine! : 'Add one so the provider knows where to come.';
+  /// Worded for either case, because from here the two are the same thing to
+  /// do: the seeker may have none saved, or several with none marked as the
+  /// default. Tapping the row offers both choosing and adding.
+  String get addressSubtitle => hasAddress
+      ? addressLine!
+      : 'Choose where the provider should come.';
 
   /// The one-line form the receipt and the order list use.
   String get addressSummary => hasAddress
       ? (addressLabel?.isNotEmpty == true
             ? '$addressLine · $addressLabel'
             : addressLine!)
-      : 'No address saved';
+      : 'No address chosen';
 
   /// Who the provider calls on the day. Seeded like the address is, until
   /// the account is wired through.
@@ -183,6 +192,7 @@ class Visit extends Equatable {
     VisitMode? mode,
     VisitSlot? slot,
     bool clearSlot = false,
+    int? addressId,
     String? addressLabel,
     String? addressLine,
     VisitPayment? payment,
@@ -196,6 +206,7 @@ class Visit extends Equatable {
     parts: parts ?? this.parts,
     mode: mode ?? this.mode,
     slot: clearSlot ? null : (slot ?? this.slot),
+    addressId: addressId ?? this.addressId,
     addressLabel: addressLabel ?? this.addressLabel,
     addressLine: addressLine ?? this.addressLine,
     contactName: contactName,
@@ -212,6 +223,7 @@ class Visit extends Equatable {
     parts,
     mode,
     slot,
+    addressId,
     addressLabel,
     addressLine,
     payment,

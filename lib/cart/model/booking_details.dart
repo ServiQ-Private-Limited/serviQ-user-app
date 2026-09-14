@@ -20,11 +20,12 @@ class BookingDetails extends Equatable {
 
   bool get hasAddress => address != null && address!.isNotEmpty;
 
-  /// What the row reads when there is nowhere to send anybody yet.
+  /// What the row reads when no address has been chosen — whether because
+  /// none is saved or because none of the saved ones is the default.
   String get addressLine =>
-      hasAddress ? address! : 'Add one so the professional knows where to come.';
+      hasAddress ? address! : 'Choose where the professional should come.';
 
-  String get addressTitle => hasAddress ? 'Location' : 'No address saved';
+  String get addressTitle => hasAddress ? 'Location' : 'No address chosen';
 
   @override
   List<Object?> get props => [address, customerName, customerPhone];

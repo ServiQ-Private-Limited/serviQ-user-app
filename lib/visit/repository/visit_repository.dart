@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:local_markerplace/me/model/saved_address.dart';
 import 'package:local_markerplace/me/repository/address_repository.dart';
 import 'package:local_markerplace/store/model/cart_product.dart';
 import 'package:local_markerplace/visit/model/visit.dart';
@@ -91,6 +92,7 @@ class VisitRepository {
         providerName: providerName,
         providerLine: providerLine,
         isVerifiedProvider: isVerifiedProvider,
+        addressId: AddressRepository.shared.defaultAddress?.id,
         addressLabel: _defaultAddressLabel,
         addressLine: _defaultAddressLine,
       );
@@ -125,6 +127,7 @@ class VisitRepository {
     final line = _defaultAddressLine;
     if (line == null) return visit;
     return visit.copyWith(
+      addressId: AddressRepository.shared.defaultAddress?.id,
       addressLabel: _defaultAddressLabel,
       addressLine: line,
     );
@@ -246,6 +249,23 @@ class VisitRepository {
     _put(existing.copyWith(mode: VisitMode.scheduled, slot: slot));
   }
 
+  /// Changes where the provider is being sent.
+  ///
+  /// Takes the saved address rather than two strings so every caller spells
+  /// it the same way, and so the id travels — the picker marks which address
+  /// the booking is already on.
+  void setAddress(String providerName, SavedAddress address) {
+    final existing = cartFor(providerName);
+    if (existing == null) return;
+    _put(
+      existing.copyWith(
+        addressId: address.id,
+        addressLabel: address.displayLabel,
+        addressLine: address.lines.replaceAll('\n', ', '),
+      ),
+    );
+  }
+
   void setPayment(String providerName, VisitPayment payment) {
     final existing = cartFor(providerName);
     if (existing == null) return;
@@ -287,6 +307,7 @@ class VisitRepository {
       services: [service],
       agreedWhen: agreedWhen,
       reference: _nextReference(),
+      addressId: AddressRepository.shared.defaultAddress?.id,
       addressLabel: _defaultAddressLabel,
       addressLine: _defaultAddressLine,
     );

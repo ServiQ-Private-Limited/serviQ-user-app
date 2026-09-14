@@ -1,3 +1,14 @@
+import java.util.Properties
+
+// The Google Maps key, read from android/local.properties rather than
+// committed. An absent key is not a build failure: the map renders grey and
+// the rest of the address flow — the pin, LOCATE ME, the geocoded address,
+// the forms — carries on working.
+val mapsApiKey: String = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}.getProperty("MAPS_API_KEY") ?: ""
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -24,10 +35,12 @@ android {
         applicationId = "com.example.local_markerplace"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // google_maps_flutter needs 21+; geolocator needs 21+.
+        minSdk = maxOf(flutter.minSdkVersion, 21)
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

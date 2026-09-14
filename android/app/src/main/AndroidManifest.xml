@@ -1,5 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Picking a delivery location: LOCATE ME centres the map on the seeker
+         and the address text is read back from the device's own geocoder.
+         Coarse is enough to place a pin in a neighbourhood; fine makes the
+         first fix quicker and the pin land on the right building. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -8,6 +14,12 @@
         android:name="${applicationName}"
         android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher">
+        <!-- Supplied from android/local.properties as MAPS_API_KEY, so the
+             key is never committed. Without one the map tiles render grey
+             and everything else on the screen still works. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -12,6 +12,7 @@ import 'package:local_markerplace/visit/model/visit_service.dart';
 import 'package:local_markerplace/visit/model/visit_mode.dart';
 import 'package:local_markerplace/visit/presentation/components/visit_bits.dart';
 import 'package:local_markerplace/visit/presentation/visit_booked_page.dart';
+import 'package:local_markerplace/me/presentation/choose_address_sheet.dart';
 import 'package:local_markerplace/visit/repository/visit_repository.dart';
 
 /// 13 · 05 — the last look before a visit is booked.
@@ -24,6 +25,7 @@ class ConfirmVisitPage extends StatelessWidget {
     super.key,
     required this.providerName,
     this.repository,
+    this.localityName,
   });
 
   /// Whose cart is being confirmed.
@@ -31,19 +33,37 @@ class ConfirmVisitPage extends StatelessWidget {
 
   final VisitRepository? repository;
 
+  /// The area a newly added address is filed under.
+  final String? localityName;
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) =>
           VisitBloc(visitRepository: repository ?? VisitRepository.shared)
             ..add(CartOpened(providerName)),
-      child: const _ConfirmVisitView(),
+      child: _ConfirmVisitView(localityName: localityName),
     );
   }
 }
 
 class _ConfirmVisitView extends StatelessWidget {
-  const _ConfirmVisitView();
+  const _ConfirmVisitView({this.localityName});
+
+  final String? localityName;
+
+  /// Changing where the provider is being sent, from the last screen before
+  /// it is booked — which is the last moment it can be put right.
+  Future<void> _changeAddress(BuildContext context, Visit visit) async {
+    final bloc = context.read<VisitBloc>();
+    final chosen = await chooseAddress(
+      context,
+      localityName: localityName,
+      currentId: visit.addressId,
+    );
+    if (chosen == null) return;
+    bloc.add(CartAddressChosen(chosen));
+  }
 
   /// Everything behind this screen is about a visit that no longer exists to
   /// edit — going back to the slot picker would land on "nothing on this
@@ -102,11 +122,7 @@ class _ConfirmVisitView extends StatelessWidget {
                         icon: Icons.place_outlined,
                         title: visit.addressTitle,
                         subtitle: visit.addressSubtitle,
-                        onChange: () => _notice(
-                          context,
-                          'Changing the address — coming '
-                          'soon.',
-                        ),
+                        onChange: () => _changeAddress(context, visit),
                       ),
                       const SizedBox(height: 22),
                       Text('SERVICES', style: DiscoveryText.tipsHeading),
@@ -185,18 +201,6 @@ class _ConfirmVisitView extends StatelessWidget {
     );
   }
 
-  void _notice(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: DiscoveryText.heroSubtitle.copyWith(color: AppColor.white),
-          ),
-        ),
-      );
-  }
 }
 
 /// When, or where — a fact with a way to change it.

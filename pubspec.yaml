@@ -44,6 +44,10 @@ dependencies:
   go_router: ^17.5.0
   dio: ^5.11.0
   flutter_secure_storage: ^9.2.4
+  google_maps_flutter: ^2.18.0
+  geolocator: ^14.0.2
+  geocoding: ^5.0.0
+  bloc_concurrency: ^0.3.0
 
 dev_dependencies:
   flutter_test:

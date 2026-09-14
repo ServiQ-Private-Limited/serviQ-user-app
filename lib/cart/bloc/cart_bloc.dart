@@ -6,6 +6,7 @@ import 'package:local_markerplace/cart/model/cart_booking_mode.dart';
 import 'package:local_markerplace/cart/model/cart_item.dart';
 import 'package:local_markerplace/cart/model/cart_slot.dart';
 import 'package:local_markerplace/cart/repository/cart_repository.dart';
+import 'package:local_markerplace/me/model/saved_address.dart';
 import 'package:local_markerplace/dashboard/model/services.dart';
 
 part 'cart_event.dart';
@@ -20,6 +21,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     on<OnChangeBookingMode>(_onChangeBookingMode);
     on<OnRemoveItem>(_onRemoveItem);
     on<OnSelectSlot>(_onSelectSlot);
+    on<OnChangeAddress>(_onChangeAddress);
     on<OnToggleBillDetails>(_onToggleBillDetails);
     on<OnDismissAlertMessage>(_onDismissAlertMessage);
   }
@@ -101,6 +103,25 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     // one also moves the cart onto that tab.
     emit(
       state.copyWith(selectedSlot: event.slot, mode: CartBookingMode.schedule),
+    );
+  }
+
+  /// Where the professional is being sent.
+  ///
+  /// Written straight into the details on screen rather than re-fetched: the
+  /// seeker has just picked it, and a card that blanks and reloads to show
+  /// the thing they chose is a worse answer than one that simply changes.
+  void _onChangeAddress(OnChangeAddress event, Emitter<CartState> emit) {
+    final details = state.bookingDetails;
+    if (details == null) return;
+    emit(
+      state.copyWith(
+        bookingDetails: BookingDetails(
+          address: event.address.lines.replaceAll('\n', ', '),
+          customerName: details.customerName,
+          customerPhone: details.customerPhone,
+        ),
+      ),
     );
   }
 

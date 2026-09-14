@@ -104,6 +104,34 @@ class SavedAddress extends Equatable {
       ? label
       : (localityName.isNotEmpty ? localityName : 'Saved address');
 
+  SavedAddress copyWith({
+    int? id,
+    String? label,
+    String? line1,
+    String? line2,
+    String? landmark,
+    String? localitySlug,
+    String? localityName,
+    String? pincode,
+    double? lat,
+    double? lng,
+    bool? isDefault,
+  }) {
+    return SavedAddress(
+      id: id ?? this.id,
+      label: label ?? this.label,
+      line1: line1 ?? this.line1,
+      line2: line2 ?? this.line2,
+      landmark: landmark ?? this.landmark,
+      localitySlug: localitySlug ?? this.localitySlug,
+      localityName: localityName ?? this.localityName,
+      pincode: pincode ?? this.pincode,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      isDefault: isDefault ?? this.isDefault,
+    );
+  }
+
   @override
   List<Object?> get props => [
     id,
