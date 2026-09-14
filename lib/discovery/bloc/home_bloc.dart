@@ -4,6 +4,7 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
 import 'package:local_markerplace/chat/repository/chat_repository.dart';
+import 'package:local_markerplace/me/repository/address_repository.dart';
 import 'package:local_markerplace/discovery/model/home_feed.dart';
 import 'package:local_markerplace/notifications/repository/notification_repository.dart';
 import 'package:local_markerplace/discovery/repository/home_repository.dart';
@@ -30,13 +31,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   final List<StreamSubscription<void>> _badges = [];
 
+  final AddressRepository addressRepository;
+
   HomeBloc({
     required this.homeRepository,
     ChatRepository? chatRepository,
     NotificationRepository? notificationRepository,
+    AddressRepository? addressRepository,
   }) : chatRepository = chatRepository ?? ChatRepository.shared,
        notificationRepository =
            notificationRepository ?? NotificationRepository.shared,
+       addressRepository = addressRepository ?? AddressRepository.shared,
        super(const HomeState.initial()) {
     on<HomeRequested>(_onHomeRequested);
     on<HomeRefreshed>(_onHomeRefreshed);
@@ -52,6 +57,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     // bell that cannot count is a bell without a badge, not an error to put
     // in front of somebody browsing.
     unawaited(this.notificationRepository.refreshBadge());
+    // Where a booking would go, fetched before anybody fills a cart.
+    //
+    // Nothing on home shows an address, but the cart and the visit screens
+    // read the seeker's default the moment a service is added — and a seeker
+    // who goes straight from home to a provider would otherwise reach the
+    // cart being told to add an address they had already saved. Failures are
+    // the repository's to swallow, as with the badge.
+    unawaited(this.addressRepository.refreshCount());
   }
 
   void _onBadgeChange(void _) {

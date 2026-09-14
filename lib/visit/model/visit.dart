@@ -35,8 +35,8 @@ class Visit extends Equatable {
     this.parts = const [],
     this.mode,
     this.slot,
-    this.addressLabel = 'Home · Ajnara Gen X',
-    this.addressLine = 'Tower B, Flat 1204, Crossings Republik',
+    this.addressLabel,
+    this.addressLine,
     this.contactName = 'Test Seeker',
     this.contactPhone = '+91 98765 43210',
     this.payment = VisitPayment.upiAfterService,
@@ -64,8 +64,35 @@ class Visit extends Equatable {
   /// Only meaningful on a scheduled visit.
   final VisitSlot? slot;
 
-  final String addressLabel;
-  final String addressLine;
+  /// Where the provider is going, taken from the seeker's saved addresses.
+  ///
+  /// Null when they have none saved — which the screens say, rather than
+  /// printing an address nobody lives at. It used to default to a written-in
+  /// "Tower B, Flat 1204, Crossings Republik", which every booking then
+  /// showed regardless of whose account it was.
+  final String? addressLabel;
+  final String? addressLine;
+
+  /// True when there is an address to send somebody to.
+  bool get hasAddress => addressLine != null && addressLine!.isNotEmpty;
+
+  /// The heading the address is shown under, and the line beneath it.
+  ///
+  /// Both say the same thing when nothing is saved, so a seeker cannot get
+  /// as far as a booking without noticing that nobody knows where to come.
+  String get addressTitle => hasAddress
+      ? (addressLabel?.isNotEmpty == true ? addressLabel! : 'Your address')
+      : 'No address saved';
+
+  String get addressSubtitle =>
+      hasAddress ? addressLine! : 'Add one so the provider knows where to come.';
+
+  /// The one-line form the receipt and the order list use.
+  String get addressSummary => hasAddress
+      ? (addressLabel?.isNotEmpty == true
+            ? '$addressLine · $addressLabel'
+            : addressLine!)
+      : 'No address saved';
 
   /// Who the provider calls on the day. Seeded like the address is, until
   /// the account is wired through.

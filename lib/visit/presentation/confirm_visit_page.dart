@@ -100,8 +100,8 @@ class _ConfirmVisitView extends StatelessWidget {
                       const SizedBox(height: 12),
                       _DetailCard(
                         icon: Icons.place_outlined,
-                        title: visit.addressLabel,
-                        subtitle: visit.addressLine,
+                        title: visit.addressTitle,
+                        subtitle: visit.addressSubtitle,
                         onChange: () => _notice(
                           context,
                           'Changing the address — coming '

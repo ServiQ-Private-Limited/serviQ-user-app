@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:local_markerplace/me/repository/address_repository.dart';
 import 'package:local_markerplace/store/model/cart_product.dart';
 import 'package:local_markerplace/visit/model/visit.dart';
 import 'package:local_markerplace/visit/model/visit_mode.dart';
@@ -90,7 +91,44 @@ class VisitRepository {
         providerName: providerName,
         providerLine: providerLine,
         isVerifiedProvider: isVerifiedProvider,
+        addressLabel: _defaultAddressLabel,
+        addressLine: _defaultAddressLine,
       );
+
+  /// The seeker's default saved address, as the visit screens show it.
+  ///
+  /// Read at the moment a visit is started rather than held, so a seeker who
+  /// saves an address and comes back gets it on the next one.
+  static String? get _defaultAddressLabel =>
+      AddressRepository.shared.defaultAddress?.displayLabel;
+
+  /// The whole address on one line, area and pincode included.
+  ///
+  /// The street alone is not enough to tell two saved addresses apart — an
+  /// account with twenty of them reading "A-1" would leave the seeker
+  /// guessing which one the provider is being sent to.
+  static String? get _defaultAddressLine {
+    final address = AddressRepository.shared.defaultAddress;
+    if (address == null) return null;
+    return address.lines.replaceAll('\n', ', ');
+  }
+
+  /// Fills in the address on a cart that was started before the seeker's
+  /// addresses had arrived.
+  ///
+  /// A cart is stamped when it is opened, which is usually after the list has
+  /// loaded — but a seeker who adds a service in the first moment after
+  /// launch would otherwise book a visit with nowhere to go, having saved an
+  /// address all along.
+  static Visit _withAddress(Visit visit) {
+    if (visit.hasAddress) return visit;
+    final line = _defaultAddressLine;
+    if (line == null) return visit;
+    return visit.copyWith(
+      addressLabel: _defaultAddressLabel,
+      addressLine: line,
+    );
+  }
 
   /// Adds [service] to that provider's cart, starting one if they have none.
   ///
@@ -249,6 +287,8 @@ class VisitRepository {
       services: [service],
       agreedWhen: agreedWhen,
       reference: _nextReference(),
+      addressLabel: _defaultAddressLabel,
+      addressLine: _defaultAddressLine,
     );
     booked.insert(0, confirmed);
     return confirmed;
@@ -256,7 +296,7 @@ class VisitRepository {
 
   /// Books one provider's cart and hands back the confirmed copy.
   Visit confirm(String providerName) {
-    final existing = cartFor(providerName)!;
+    final existing = _withAddress(cartFor(providerName)!);
     final confirmed = existing.copyWith(reference: _nextReference());
     booked.insert(0, confirmed);
     removeCart(providerName);

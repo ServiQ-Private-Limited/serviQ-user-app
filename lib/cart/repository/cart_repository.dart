@@ -3,6 +3,7 @@ import 'package:local_markerplace/cart/model/booking_details.dart';
 import 'package:local_markerplace/cart/model/cart_item.dart';
 import 'package:local_markerplace/cart/model/cart_slot.dart';
 import 'package:local_markerplace/dashboard/model/services.dart';
+import 'package:local_markerplace/me/repository/address_repository.dart';
 import 'package:local_markerplace/network/failure.dart';
 
 /// Everything the cart needs from the backend: what the chosen services cost
@@ -101,14 +102,22 @@ class CartRepository {
   }
 
   /// The saved address and contact the booking will use.
+  ///
+  /// The address is the seeker's own, read from `/api/v1/user/addresses`, and
+  /// is absent rather than invented when they have saved none.
   Future<Either<Failure, BookingDetails>> getBookingDetails() async {
-    // TODO: replace with the signed-in customer's saved address and contact.
-    await Future.delayed(const Duration(milliseconds: 400));
-    return const Right(
+    final addresses = AddressRepository.shared;
+    // Only fetched when nothing has been loaded yet: coming to the cart from
+    // the addresses screen should not ask the server twice.
+    if (addresses.count == null) await addresses.refreshCount();
+    final address = addresses.defaultAddress;
+
+    return Right(
       BookingDetails(
-        address:
-            '750, Floor Ground floor, Shakti khand 4, 767, Shakti Khand 4, '
-            'Shakti Khand 2, Indirapuram, Ghaziabad',
+        address: address == null ? null : address.lines.replaceAll('\n', ', '),
+        // TODO: the contact is still seeded — the name and number the
+        // professional would be given are not yet read from the signed-in
+        // account, only the address is.
         customerName: 'Chakori',
         customerPhone: '+91 8527917303',
       ),

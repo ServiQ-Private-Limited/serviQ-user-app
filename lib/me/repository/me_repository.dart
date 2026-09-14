@@ -1,7 +1,7 @@
 import 'package:local_markerplace/visit/repository/visit_repository.dart';
 import 'package:local_markerplace/chat/repository/chat_repository.dart';
 import 'package:local_markerplace/me/model/kyc_document.dart';
-import 'package:local_markerplace/me/model/saved_address.dart';
+import 'package:local_markerplace/me/repository/address_repository.dart';
 import 'package:local_markerplace/me/model/saved_provider.dart';
 import 'package:local_markerplace/me/model/seeker_account.dart';
 import 'package:local_markerplace/onboarding/model/seeker_profile.dart';
@@ -42,7 +42,11 @@ class MeRepository {
       bookedOrders: VisitRepository.shared.booked.length,
       unreadChats: ChatRepository.shared.unreadCount,
       savedProviderCount: savedProviders().length,
-      savedAddressCount: addresses().length,
+      // What the addresses endpoint last reported, not a figure typed in:
+      // the row would otherwise promise addresses the seeker has not saved.
+      // Null until something has been loaded, which the row reads as "not
+      // counted yet" rather than as none.
+      savedAddressCount: AddressRepository.shared.count,
       interests: interests.isEmpty
           ? const ['Home repairs', 'Cleaning']
           : interests,
@@ -147,20 +151,4 @@ class MeRepository {
     ),
   ];
 
-  List<SavedAddress> addresses() => const [
-    SavedAddress(
-      label: 'Home',
-      lines: 'Tower B, Flat 1204\nAjnara Gen X, Crossings Republik',
-      isDefault: true,
-    ),
-    SavedAddress(
-      label: 'Office',
-      lines: 'Unit 12, Galleria Market 1\nCrossings Republik',
-    ),
-    SavedAddress(
-      label: 'Mum',
-      lines: 'C-402, Mahagun Mascot',
-      isServiceable: false,
-    ),
-  ];
 }

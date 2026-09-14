@@ -252,7 +252,7 @@ class _Summary extends StatelessWidget {
           Text(visit.whenLabel, style: DiscoveryText.groupHeading),
           const SizedBox(height: 6),
           Text(
-            '${visit.addressLine} · ${visit.addressLabel}',
+            visit.addressSummary,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: DiscoveryText.meta,

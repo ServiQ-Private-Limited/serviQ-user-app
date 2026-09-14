@@ -413,7 +413,6 @@ class _DiscoveryShellViewState extends State<_DiscoveryShellView> {
       ),
       onAddresses: () => _push(
         AddressesPage(
-          repository: widget.meRepository,
           onTabSelected: _selectTabFromChild,
           onPost: _openPostForm,
         ),

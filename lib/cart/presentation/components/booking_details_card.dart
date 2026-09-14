@@ -39,8 +39,8 @@ class BookingDetailsCard extends StatelessWidget {
           ],
           _DetailRow(
             icon: Icons.location_on_outlined,
-            title: 'Location',
-            subtitle: details.address,
+            title: details.addressTitle,
+            subtitle: details.addressLine,
             onTap: onEditAddress,
           ),
           const _RowDivider(),

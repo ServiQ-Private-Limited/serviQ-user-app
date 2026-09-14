@@ -288,7 +288,7 @@ class _YourVisitViewState extends State<_YourVisitView> {
           CartDetailRow(
             icon: Icons.place_outlined,
             title: 'Location',
-            subtitle: '${visit.addressLine}, ${visit.addressLabel}',
+            subtitle: visit.addressSubtitle,
             onTap: () => _notice('Changing the address — coming soon.'),
           ),
           const CartDivider(),

@@ -12,7 +12,7 @@ class SeekerAccount extends Equatable {
     required this.bookedOrders,
     required this.unreadChats,
     required this.savedProviderCount,
-    required this.savedAddressCount,
+    this.savedAddressCount,
     required this.interests,
     required this.kycStatus,
   });
@@ -32,7 +32,10 @@ class SeekerAccount extends Equatable {
   final int bookedOrders;
   final int unreadChats;
   final int savedProviderCount;
-  final int savedAddressCount;
+  /// Null until the addresses endpoint has answered — the Me row shows a
+  /// dash rather than claiming zero for a seeker whose addresses have simply
+  /// not been fetched yet.
+  final int? savedAddressCount;
 
   /// Category labels the seeker picked, in the order Edit profile shows them.
   final List<String> interests;

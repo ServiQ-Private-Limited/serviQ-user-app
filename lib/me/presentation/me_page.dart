@@ -113,7 +113,12 @@ class MeView extends StatelessWidget {
                   index: 7,
                   child: MeRow(
                     title: 'Addresses',
-                    value: '${account.savedAddressCount} saved',
+                    // Until the endpoint has answered there is no figure to
+                    // give, and "0 saved" would be a claim rather than a
+                    // count.
+                    value: account.savedAddressCount == null
+                        ? 'Saved addresses'
+                        : '${account.savedAddressCount} saved',
                     onTap: onAddresses,
                   ),
                 ),

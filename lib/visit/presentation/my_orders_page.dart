@@ -223,7 +223,7 @@ class OrderCard extends StatelessWidget {
             ),
           const SizedBox(height: 4),
           Text(
-            '${order.addressLine} · ${order.addressLabel}',
+            order.addressSummary,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: DiscoveryText.fine,

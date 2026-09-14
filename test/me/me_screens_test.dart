@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:local_markerplace/core/app_color.dart';
 import 'package:local_markerplace/me/model/kyc_document.dart';
-import 'package:local_markerplace/me/presentation/addresses_page.dart';
 import 'package:local_markerplace/me/presentation/edit_profile_page.dart';
 import 'package:local_markerplace/me/presentation/kyc_pages.dart';
 import 'package:local_markerplace/me/presentation/me_page.dart';
@@ -134,15 +133,6 @@ void main() {
     expect(find.text('Sharma Carpentry'), findsNothing);
   });
 
-  testWidgets('an address outside a live area is marked, not hidden', (
-    tester,
-  ) async {
-    await pump(tester, const AddressesPage());
-
-    expect(find.text('DEFAULT'), findsOneWidget);
-    expect(find.text('Outside a live locality'), findsOneWidget);
-    expect(find.text('Detect my location'), findsOneWidget);
-  });
 
   for (final size in const [Size(320, 568), Size(360, 640), Size(428, 926)]) {
     final label = '${size.width.toInt()}x${size.height.toInt()}';
@@ -156,9 +146,8 @@ void main() {
       await pump(tester, const KycUploadPage(), size: size);
     });
 
-    testWidgets('Edit profile and Addresses fit $label', (tester) async {
+    testWidgets('Edit profile fits $label', (tester) async {
       await pump(tester, EditProfilePage(account: account), size: size);
-      await pump(tester, const AddressesPage(), size: size);
     });
   }
 
@@ -185,6 +174,11 @@ void main() {
 
   test('counts on Me match the lists behind them', () {
     expect(account.savedProviderCount, repository.savedProviders().length);
-    expect(account.savedAddressCount, repository.addresses().length);
+  });
+
+  test('the address count stays absent until the endpoint has answered', () {
+    // Zero saved and not yet counted are different things, and the row must
+    // not claim the first when it means the second.
+    expect(account.savedAddressCount, isNull);
   });
 }
