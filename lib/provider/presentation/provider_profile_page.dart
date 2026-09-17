@@ -46,6 +46,7 @@ class ProviderProfilePage extends StatelessWidget {
     this.source,
     this.onTabSelected,
     this.onPost,
+    this.onChat,
   });
 
   /// "dev-electricals" — how the endpoint names a provider. Everything on
@@ -59,6 +60,11 @@ class ProviderProfilePage extends StatelessWidget {
   final ProviderSource? source;
   final ValueChanged<DiscoveryTab>? onTabSelected;
   final VoidCallback? onPost;
+
+  /// Opens the conversation with this provider — the existing one if they
+  /// have spoken, a new one if they have not. Null where there is nowhere to
+  /// send them, and then Chat says so rather than doing nothing.
+  final void Function(ProviderDetail provider)? onChat;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +89,7 @@ class ProviderProfilePage extends StatelessWidget {
         initialTab: initialTab,
         onTabSelected: onTabSelected,
         onPost: onPost,
+        onChat: onChat,
       ),
     );
   }
@@ -95,6 +102,7 @@ class _ProviderProfileView extends StatefulWidget {
     required this.initialTab,
     required this.onTabSelected,
     required this.onPost,
+    required this.onChat,
   });
 
   final bool isSignedIn;
@@ -102,6 +110,7 @@ class _ProviderProfileView extends StatefulWidget {
   final ProviderTab initialTab;
   final ValueChanged<DiscoveryTab>? onTabSelected;
   final VoidCallback? onPost;
+  final void Function(ProviderDetail provider)? onChat;
 
   @override
   State<_ProviderProfileView> createState() => _ProviderProfileViewState();
@@ -191,6 +200,23 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
     _addToVisit(match.first.asDisplay);
   }
 
+  /// Opens the conversation with this provider.
+  ///
+  /// Signed out there is nothing to open — a thread belongs to an account —
+  /// so the action says what signing in would buy them instead.
+  void _chat() {
+    if (!widget.isSignedIn) {
+      _gatedAction('chat');
+      return;
+    }
+    final open = widget.onChat;
+    if (open == null) {
+      _notice('Chat — coming soon.');
+      return;
+    }
+    open(_profile);
+  }
+
   /// Switches tab, and asks that tab's own endpoint for what it shows.
   ///
   /// The About payload seeded every tab when the page opened, so this is a
@@ -276,7 +302,7 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
                 profile: _profile,
                 isSignedIn: widget.isSignedIn,
                 onConnect: () => _gatedAction('connect'),
-                onChat: () => _gatedAction('chat'),
+                onChat: _chat,
                 onMore: () => _notice('More options — coming soon.'),
               ),
             ),

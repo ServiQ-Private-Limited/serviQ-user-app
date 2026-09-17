@@ -8,6 +8,8 @@ import 'package:local_markerplace/components/skeleton/skeleton.dart';
 import 'package:local_markerplace/visit/presentation/my_orders_page.dart';
 import 'package:local_markerplace/dashboard/presentation/posts/presentation/my_posts_page.dart';
 import 'package:local_markerplace/chat/presentation/chats_page.dart';
+import 'package:local_markerplace/provider/model/provider_detail.dart';
+import 'package:local_markerplace/provider/model/provider_display.dart';
 import 'package:local_markerplace/core/app_color.dart';
 import 'package:local_markerplace/core/app_routes.dart';
 import 'package:local_markerplace/discovery/model/locality.dart';
@@ -260,6 +262,42 @@ class _DiscoveryShellViewState extends State<_DiscoveryShellView> {
     );
   }
 
+  /// Chat, from a provider's own page.
+  ///
+  /// Leaves the profile rather than stacking a conversation on top of it, so
+  /// closing the thread lands on the conversation list — which is where a
+  /// seeker who has just messaged somebody expects to be, and where the
+  /// thread they started is now the first row.
+  ///
+  /// Whether they have spoken before is the repository's business: it opens
+  /// the existing thread or starts one, so this is the same journey either
+  /// way.
+  Future<void> _openChatWith(ProviderDetail provider) async {
+    final navigator = Navigator.of(context);
+    // Off the profile first.
+    navigator.pop();
+
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (_) => ChatsPage(
+          onTabSelected: _selectTabFromChild,
+          onPost: _openPostForm,
+          // Straight into the conversation, rather than leaving the seeker
+          // to find the provider they just tapped Chat on.
+          openWith: ChatOpenRequest(
+            providerName: provider.name,
+            isVerified: provider.verified,
+            replyLine: provider.responseLine,
+          ),
+          onFindProvider: () {
+            Navigator.of(context).pop();
+            _bloc.add(const DiscoveryTabSelected(DiscoveryTab.explore));
+          },
+        ),
+      ),
+    );
+  }
+
   /// Home's category tiles are a way into the catalogue, not six screens:
   /// "See all" opens it unfiltered, a tile opens it with that chip lit.
   ///
@@ -298,6 +336,7 @@ class _DiscoveryShellViewState extends State<_DiscoveryShellView> {
           localityName: _localityName ?? '',
           onTabSelected: _selectTabFromChild,
           onPost: _openPostForm,
+          onChat: _openChatWith,
         ),
       ),
     );

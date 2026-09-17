@@ -33,10 +33,19 @@ class ConversationBloc extends Bloc<ConversationEvent, ConversationState> {
   }
 
   /// Opening a thread clears its badge — the seeker has now seen it.
+  ///
+  /// The thread is started here when there is none: chatting from a
+  /// provider's page is the one way in that does not begin with a
+  /// conversation already existing.
   void _onConversationOpened(
     ConversationOpened event,
     Emitter<ConversationState> emit,
   ) {
+    chatRepository.openWith(
+      event.providerName,
+      isVerified: event.isVerified,
+      replyLine: event.replyLine,
+    );
     emit(
       state.copyWith(
         providerName: event.providerName,

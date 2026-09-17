@@ -18,16 +18,37 @@ import 'package:local_markerplace/discovery/presentation/components/discovery_te
 /// note at the foot of the list: chats open when an offer is accepted or a
 /// provider is connected with, and until then nobody has the seeker's
 /// number. The empty state offers the two things that would open one.
+/// Who to open a conversation with the moment the list appears.
+///
+/// Carries what the provider's page knew about them, which is only used if
+/// there is no thread yet and this open has to start one.
+class ChatOpenRequest {
+  const ChatOpenRequest({
+    required this.providerName,
+    this.isVerified = true,
+    this.replyLine,
+  });
+
+  final String providerName;
+  final bool isVerified;
+  final String? replyLine;
+}
+
 class ChatsPage extends StatelessWidget {
   const ChatsPage({
     super.key,
     this.repository,
+    this.openWith,
     this.onTabSelected,
     this.onPost,
     this.onFindProvider,
   });
 
   final ChatRepository? repository;
+
+  /// Set when the list was opened in order to reach one conversation — the
+  /// Chat button on a provider's page. Null when the seeker came to browse.
+  final ChatOpenRequest? openWith;
   final ValueChanged<DiscoveryTab>? onTabSelected;
   final VoidCallback? onPost;
 
@@ -42,6 +63,7 @@ class ChatsPage extends StatelessWidget {
             ..add(const ChatsRequested()),
       child: _ChatsView(
         repository: repository,
+        openWith: openWith,
         onTabSelected: onTabSelected,
         onPost: onPost,
         onFindProvider: onFindProvider,
@@ -53,12 +75,14 @@ class ChatsPage extends StatelessWidget {
 class _ChatsView extends StatefulWidget {
   const _ChatsView({
     required this.repository,
+    required this.openWith,
     required this.onTabSelected,
     required this.onPost,
     required this.onFindProvider,
   });
 
   final ChatRepository? repository;
+  final ChatOpenRequest? openWith;
   final ValueChanged<DiscoveryTab>? onTabSelected;
   final VoidCallback? onPost;
   final VoidCallback? onFindProvider;
@@ -73,22 +97,47 @@ class _ChatsViewState extends State<_ChatsView> {
   final TextEditingController _query = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Opened in order to reach one conversation, so it is opened straight
+    // away — after the first frame, so the list is behind it when the
+    // seeker closes the thread rather than a blank screen.
+    final request = widget.openWith;
+    if (request == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _open(
+        request.providerName,
+        isVerified: request.isVerified,
+        replyLine: request.replyLine,
+      );
+    });
+  }
+
+  @override
   void dispose() {
     _query.dispose();
     super.dispose();
   }
 
-  Future<void> _open(String providerName) async {
+  Future<void> _open(
+    String providerName, {
+    bool isVerified = true,
+    String? replyLine,
+  }) async {
     final bloc = context.read<ChatsBloc>();
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ConversationPage(
           providerName: providerName,
+          isVerified: isVerified,
+          replyLine: replyLine,
           repository: widget.repository,
         ),
       ),
     );
-    // Reading a thread clears its badge, so the list is asked again.
+    // Reading a thread clears its badge, so the list is asked again — and a
+    // thread started by this open is now a row in it.
     bloc.add(const ChatsRequested());
   }
 

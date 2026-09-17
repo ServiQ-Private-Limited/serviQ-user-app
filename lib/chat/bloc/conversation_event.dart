@@ -8,10 +8,19 @@ sealed class ConversationEvent extends Equatable {
 final class ConversationOpened extends ConversationEvent {
   final String providerName;
 
-  const ConversationOpened(this.providerName);
+  /// What the provider's own page knows about them, used only when there is
+  /// no thread yet and one has to be started.
+  final bool isVerified;
+  final String? replyLine;
+
+  const ConversationOpened(
+    this.providerName, {
+    this.isVerified = true,
+    this.replyLine,
+  });
 
   @override
-  List<Object> get props => [providerName];
+  List<Object?> get props => [providerName, isVerified, replyLine];
 }
 
 final class MessageSent extends ConversationEvent {

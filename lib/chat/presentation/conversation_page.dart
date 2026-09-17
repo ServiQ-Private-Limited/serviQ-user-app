@@ -23,11 +23,17 @@ class ConversationPage extends StatelessWidget {
   const ConversationPage({
     super.key,
     required this.providerName,
+    this.isVerified = true,
+    this.replyLine,
     this.repository,
     this.visits,
   });
 
   final String providerName;
+
+  /// Only used when there is no thread yet and this open starts one.
+  final bool isVerified;
+  final String? replyLine;
   final ChatRepository? repository;
   final VisitRepository? visits;
 
@@ -37,7 +43,13 @@ class ConversationPage extends StatelessWidget {
       create: (_) => ConversationBloc(
         chatRepository: repository ?? ChatRepository.shared,
         visitRepository: visits ?? VisitRepository.shared,
-      )..add(ConversationOpened(providerName)),
+      )..add(
+        ConversationOpened(
+          providerName,
+          isVerified: isVerified,
+          replyLine: replyLine,
+        ),
+      ),
       child: const _ConversationView(),
     );
   }
@@ -134,7 +146,9 @@ class _ConversationViewState extends State<_ConversationView> {
                 color: AppColor.discoveryBorder,
               ),
               Expanded(
-                child: ListView.builder(
+                child: messages.isEmpty
+                    ? _NothingSaidYet(providerName: thread.providerName)
+                    : ListView.builder(
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   itemCount: messages.length + 1,
@@ -243,13 +257,15 @@ class _Header extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: DiscoveryText.rowTitle.copyWith(fontSize: 14.5),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  about == null ? thread.replyLine : 'On "$about"',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: DiscoveryText.smallPrint,
-                ),
+                if (about != null || thread.replyLine.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    about == null ? thread.replyLine : 'On "$about"',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: DiscoveryText.smallPrint,
+                  ),
+                ],
               ],
             ),
           ),
@@ -276,6 +292,49 @@ class _AcceptNote extends StatelessWidget {
         'Accepting shares your number with ${thread.providerName} only.',
         textAlign: TextAlign.center,
         style: DiscoveryText.fine,
+      ),
+    );
+  }
+}
+
+/// A conversation that has just been started from a provider's page.
+///
+/// Says so rather than opening on a blank scroll: nobody has written
+/// anything, and a thread with no messages is a normal thing to be looking
+/// at when you are the one about to send the first.
+class _NothingSaidYet extends StatelessWidget {
+  const _NothingSaidYet({required this.providerName});
+
+  final String providerName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 34,
+              color: AppColor.discoveryTextTertiary,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'No messages yet',
+              textAlign: TextAlign.center,
+              style: DiscoveryText.sectionTitleSmall,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Say what you need and $providerName will pick it up here. '
+              'Your number stays hidden until you accept an offer.',
+              textAlign: TextAlign.center,
+              style: DiscoveryText.publicNote,
+            ),
+          ],
+        ),
       ),
     );
   }

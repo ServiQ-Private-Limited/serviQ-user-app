@@ -50,6 +50,41 @@ class ChatRepository {
   ChatThread byName(String providerName) =>
       _threads.firstWhere((thread) => thread.providerName == providerName);
 
+  /// The thread with [providerName], whether or not there was one.
+  ///
+  /// Chatting from a provider's page has to land somewhere: if they have
+  /// spoken before it is that conversation, and if they have not it is a new
+  /// empty one rather than a crash. [byName] throws for a provider with no
+  /// thread, which is right for a list that only shows threads that exist
+  /// and wrong for a button that starts one.
+  ///
+  /// A started thread carries no messages, because none have been sent. The
+  /// conversation screen says so rather than opening with something nobody
+  /// wrote.
+  ChatThread openWith(
+    String providerName, {
+    bool isVerified = true,
+    String? replyLine,
+  }) {
+    final existing = _indexOf(providerName);
+    if (existing != -1) return _threads[existing];
+
+    final started = ChatThread(
+      providerName: providerName,
+      messages: const [],
+      isVerified: isVerified,
+      // Only when the provider's own page said so. The default is a line
+      // nobody measured, so a thread started without one leaves it out.
+      replyLine: replyLine ?? '',
+    );
+    _threads.insert(0, started);
+    _announce();
+    return started;
+  }
+
+  /// Whether a conversation with them has been started.
+  bool hasThreadWith(String providerName) => _indexOf(providerName) != -1;
+
   int _indexOf(String providerName) =>
       _threads.indexWhere((thread) => thread.providerName == providerName);
 
