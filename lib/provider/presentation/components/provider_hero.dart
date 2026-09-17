@@ -11,7 +11,8 @@ import 'package:local_markerplace/discovery/presentation/components/discovery_as
 import 'package:local_markerplace/discovery/presentation/components/discovery_text.dart';
 import 'package:local_markerplace/discovery/presentation/components/provider_avatar.dart';
 import 'package:local_markerplace/discovery/presentation/components/trade_glyph.dart';
-import 'package:local_markerplace/provider/model/provider_profile.dart';
+import 'package:local_markerplace/provider/model/provider_detail.dart';
+import 'package:local_markerplace/provider/model/provider_display.dart';
 
 /// The head of a provider's page: their avatar, name, what vouches for them,
 /// and the two actions.
@@ -35,7 +36,7 @@ class ProviderHero extends StatelessWidget {
     this.onMore,
   });
 
-  final ProviderProfile profile;
+  final ProviderDetail profile;
   final bool isSignedIn;
   final VoidCallback? onConnect;
   final VoidCallback? onChat;
@@ -45,12 +46,12 @@ class ProviderHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = ArtPalette.forSeed(profile.name);
-    // The trade is not a field on a profile, so it is read off the first
-    // service they list, falling back to their name — which is usually where
-    // a one-trade business says what it does anyway.
-    final trade = profile.services.isEmpty
+    // The trade the watermark is drawn from. The endpoint names it outright
+    // in `categories`, so the glyph no longer has to be guessed at from
+    // whichever service happened to be listed first.
+    final trade = profile.categories.isEmpty
         ? profile.name
-        : profile.services.first.name;
+        : profile.categories.first.tradeName;
 
     return ClipRect(
       child: BezierWash(
@@ -102,7 +103,7 @@ class ProviderHero extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      profile.locationLine,
+                      profile.heroLine,
                       textAlign: TextAlign.center,
                       style: DiscoveryText.caption,
                     ),
@@ -186,7 +187,7 @@ class _HeaderRow extends StatelessWidget {
 class _Avatar extends StatelessWidget {
   const _Avatar({required this.profile});
 
-  final ProviderProfile profile;
+  final ProviderDetail profile;
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +201,7 @@ class _Avatar extends StatelessWidget {
         initials: profile.initials,
         seed: profile.name,
         size: 88,
-        isVerified: profile.isVerified,
+        isVerified: profile.verified,
         hasRing: true,
       ),
     );
@@ -210,11 +211,11 @@ class _Avatar extends StatelessWidget {
 class _TrustRow extends StatelessWidget {
   const _TrustRow({required this.profile});
 
-  final ProviderProfile profile;
+  final ProviderDetail profile;
 
   @override
   Widget build(BuildContext context) {
-    final isVerified = profile.isVerified;
+    final isVerified = profile.verified;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -232,8 +233,13 @@ class _TrustRow extends StatelessWidget {
             style: isVerified ? DiscoveryText.pill : DiscoveryText.pillMuted,
           ),
         ),
-        const SizedBox(width: 8),
-        Text(profile.since, style: DiscoveryText.footnoteStrong),
+        // The endpoint reports no date a provider joined, so nothing is
+        // said about one. What it does report is whether they are open, and
+        // that is worth more to somebody deciding whether to call.
+        if (profile.homeService) ...[
+          const SizedBox(width: 8),
+          Text('Comes to you', style: DiscoveryText.footnoteStrong),
+        ],
       ],
     );
   }

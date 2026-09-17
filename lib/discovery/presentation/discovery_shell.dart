@@ -282,12 +282,20 @@ class _DiscoveryShellViewState extends State<_DiscoveryShellView> {
   }
 
   /// Every list of providers in the flow ends here.
+  ///
+  /// A summary with no slug cannot be opened: the endpoint names providers
+  /// by slug, and one worked out from the display name would be a guess that
+  /// answers 404 for anybody whose name is not exactly their slug.
   void _openProvider(ProviderSummary provider) {
+    if (!provider.canOpenProfile) {
+      _notice('${provider.name} — profile not available yet.');
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ProviderProfilePage(
-          providerName: provider.name,
-          localityName: _localityName ?? 'Ajnara Gen X',
+          slug: provider.slug,
+          localityName: _localityName ?? '',
           onTabSelected: _selectTabFromChild,
           onPost: _openPostForm,
         ),
@@ -435,13 +443,9 @@ class _DiscoveryShellViewState extends State<_DiscoveryShellView> {
   }
 
   void _openSavedProvider(SavedProvider provider) {
-    _push(
-      ProviderProfilePage(
-        providerName: provider.name,
-        localityName: _localityName ?? 'Ajnara Gen X',
-        onTabSelected: _selectTabFromChild,
-      ),
-    );
+    // Saved providers are still seed data with no slug on them, and the
+    // profile endpoint takes a slug. Rather than guess one, the row says so.
+    _notice('${provider.name} — saved providers are not wired up yet.');
   }
 
   Widget _body() {

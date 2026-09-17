@@ -1,9 +1,9 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
-import 'package:local_markerplace/provider/model/provider_profile.dart';
+import 'package:local_markerplace/provider/model/provider_detail.dart';
+import 'package:local_markerplace/provider/model/provider_display.dart';
 import 'package:local_markerplace/provider/presentation/components/segmented_tabs.dart';
-import 'package:local_markerplace/provider/repository/provider_repository.dart';
 import 'package:local_markerplace/store/model/cart_product.dart';
 import 'package:local_markerplace/visit/model/visit.dart';
 import 'package:local_markerplace/visit/model/visit_service.dart';
@@ -19,13 +19,10 @@ part 'provider_state.dart';
 /// in the basket — and reading the cart from inside the build was what made
 /// those rows go stale.
 class ProviderBloc extends Bloc<ProviderEvent, ProviderState> {
-  final ProviderRepository providerRepository;
   final VisitRepository visitRepository;
 
-  ProviderBloc({
-    required this.providerRepository,
-    required this.visitRepository,
-  }) : super(const ProviderState.initial()) {
+  ProviderBloc({required this.visitRepository})
+    : super(const ProviderState.initial()) {
     on<ProviderRequested>(_onProviderRequested);
     on<ProviderCartRefreshed>(_onCartRefreshed);
     on<ProviderTabSelected>(_onTabSelected);
@@ -39,13 +36,12 @@ class ProviderBloc extends Bloc<ProviderEvent, ProviderState> {
     ProviderRequested event,
     Emitter<ProviderState> emit,
   ) {
-    final profile = providerRepository.forName(event.providerName);
     emit(
       state.copyWith(
-        profile: profile,
+        profile: event.detail,
         localityName: event.localityName,
         tab: event.initialTab,
-        cart: visitRepository.cartFor(profile.name),
+        cart: visitRepository.cartFor(event.detail.name),
         isLoading: false,
       ),
     );
@@ -74,7 +70,7 @@ class ProviderBloc extends Bloc<ProviderEvent, ProviderState> {
     visitRepository.addService(
       providerName: profile.name,
       providerLine: state.providerLine,
-      isVerifiedProvider: profile.isVerified,
+      isVerifiedProvider: profile.verified,
       service: event.service,
     );
     emit(state.copyWith(cart: _cart()));
@@ -98,7 +94,7 @@ class ProviderBloc extends Bloc<ProviderEvent, ProviderState> {
     visitRepository.addProduct(
       providerName: profile.name,
       providerLine: state.providerLine,
-      isVerifiedProvider: profile.isVerified,
+      isVerifiedProvider: profile.verified,
       product: event.product,
     );
     emit(state.copyWith(cart: _cart()));

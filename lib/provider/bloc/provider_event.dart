@@ -4,20 +4,24 @@ sealed class ProviderEvent extends Equatable {
   const ProviderEvent();
 }
 
-/// Open the page for this provider.
+/// The provider has loaded — attach the cart to them.
+///
+/// Carries the detail the endpoint returned rather than a name to look up:
+/// there is no local catalogue any more, and the cart needs the same facts
+/// the page is drawing from.
 final class ProviderRequested extends ProviderEvent {
-  final String providerName;
+  final ProviderDetail detail;
   final String localityName;
   final ProviderTab initialTab;
 
   const ProviderRequested({
-    required this.providerName,
+    required this.detail,
     required this.localityName,
     required this.initialTab,
   });
 
   @override
-  List<Object> get props => [providerName, localityName, initialTab];
+  List<Object> get props => [detail, localityName, initialTab];
 }
 
 /// Read the cart again, after somewhere that could have changed it.

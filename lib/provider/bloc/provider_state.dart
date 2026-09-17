@@ -2,7 +2,7 @@ part of 'provider_bloc.dart';
 
 class ProviderState extends Equatable {
   /// Null until the page has been asked for.
-  final ProviderProfile? profile;
+  final ProviderDetail? profile;
 
   /// What is in this provider's cart, or null when nothing is. A cart
   /// belongs to one provider, so another store's is not this page's
@@ -32,7 +32,7 @@ class ProviderState extends Equatable {
   });
 
   ProviderState copyWith({
-    ProviderProfile? profile,
+    ProviderDetail? profile,
     Visit? cart,
 
     /// Lets a cart that has just been emptied come back as null rather than
@@ -52,7 +52,21 @@ class ProviderState extends Equatable {
   }
 
   /// "Ajnara Gen X · usually replies in 10 min".
-  String get providerLine => '$localityName · usually replies in 10 min';
+  /// "Galleria Market 1 · usually replies in 1 min" — the line under the
+  /// provider's name wherever the cart shows who it is with.
+  ///
+  /// Built from what the endpoint actually said. It used to read "usually
+  /// replies in 10 min" for everybody, which was a number nobody had
+  /// measured; a provider the server reports no response time for now simply
+  /// has no such clause.
+  String get providerLine {
+    final detail = profile;
+    final area = detail?.homeLocality?.name.isNotEmpty == true
+        ? detail!.homeLocality!.name
+        : localityName;
+    final replies = detail?.responseLine ?? '';
+    return replies.isEmpty ? area : '$area · $replies';
+  }
 
   /// A service is one job, so it is on the visit or off it rather than
   /// counted.

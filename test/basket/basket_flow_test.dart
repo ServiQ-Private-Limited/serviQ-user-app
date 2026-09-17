@@ -1,8 +1,14 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:local_markerplace/provider/model/provider_detail.dart';
+
+import '../support/fake_provider_source.dart';
+import '../provider/provider_api_test.dart' show capturedProvider, capturedReviews;
 
 import 'package:local_markerplace/discovery/presentation/components/discovery_tab_bar.dart';
 import 'package:local_markerplace/discovery/presentation/components/pending_booking_bar.dart';
@@ -41,6 +47,17 @@ Future<void> pump(WidgetTester tester, Widget screen) async {
     ),
   );
   await tester.pumpAndSettle();
+}
+
+/// The provider endpoints, answering with the payload they actually return.
+FakeProviderSource providerSource() {
+  Map<String, dynamic> dataOf(String raw) =>
+      (jsonDecode(raw) as Map<String, dynamic>)['responseData']
+          as Map<String, dynamic>;
+  return FakeProviderSource(
+    detail: ProviderDetail.fromJson(dataOf(capturedProvider)),
+    reviewPage: ProviderReviewPage.fromJson(dataOf(capturedReviews)),
+  );
 }
 
 void main() {
@@ -195,10 +212,11 @@ void main() {
     ) async {
       await pump(
         tester,
-        const ProviderProfilePage(
-          providerName: 'Shahnaz RO & Chimney Services',
+        ProviderProfilePage(
+          slug: 'dev-electricals',
           initialTab: ProviderTab.store,
           localityName: locality,
+          source: providerSource(),
         ),
       );
 
@@ -209,7 +227,7 @@ void main() {
 
       await tester.tap(find.text('Add').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Add to cart · ₹1,200'));
+      await tester.tap(find.text('Add to cart · ₹349'));
       await tester.pumpAndSettle();
       Navigator.of(tester.element(find.text('My Cart'))).pop();
       await tester.pumpAndSettle();
@@ -256,16 +274,17 @@ void main() {
     testWidgets('turns Add into a stepper that can delete it', (tester) async {
       await pump(
         tester,
-        const ProviderProfilePage(
-          providerName: 'Shahnaz RO & Chimney Services',
+        ProviderProfilePage(
+          slug: 'dev-electricals',
           initialTab: ProviderTab.store,
           localityName: locality,
+          source: providerSource(),
         ),
       );
 
       await tester.tap(find.text('Add').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Add to cart · ₹1,200'));
+      await tester.tap(find.text('Add to cart · ₹349'));
       await tester.pumpAndSettle();
       // Adding opens the cart; come back to the grid.
       Navigator.of(tester.element(find.text('My Cart'))).pop();

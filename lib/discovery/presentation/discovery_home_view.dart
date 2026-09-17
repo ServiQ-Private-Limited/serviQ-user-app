@@ -211,6 +211,7 @@ class _HomeViewState extends State<_HomeView> {
     for (final provider in state.providersNearYou)
       ProviderSummary(
         name: provider.name,
+        slug: provider.slug,
         trade: provider.localityName,
         rating: provider.ratingAverage,
         reviewCount: provider.reviewCount,

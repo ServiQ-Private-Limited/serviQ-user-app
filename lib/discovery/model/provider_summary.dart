@@ -5,6 +5,7 @@ import 'package:equatable/equatable.dart';
 class ProviderSummary extends Equatable {
   const ProviderSummary({
     required this.name,
+    this.slug = '',
     required this.trade,
     required this.rating,
     required this.reviewCount,
@@ -14,6 +15,16 @@ class ProviderSummary extends Equatable {
   });
 
   final String name;
+
+  /// "dev-electricals" — how `/api/v1/user/providers/{slug}` names them.
+  ///
+  /// Empty on a summary that came from somewhere with no slug to give, and
+  /// then there is no profile to open: the endpoint takes a slug, and one
+  /// derived from the display name would be a guess.
+  final String slug;
+
+  /// Whether this summary can be opened. False when nothing gave it a slug.
+  bool get canOpenProfile => slug.isNotEmpty;
 
   /// "RO Repair · Chimney" — what they do, already joined for display.
   final String trade;
@@ -40,6 +51,7 @@ class ProviderSummary extends Equatable {
   @override
   List<Object?> get props => [
     name,
+    slug,
     trade,
     rating,
     reviewCount,

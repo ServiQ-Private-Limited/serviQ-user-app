@@ -2,22 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_markerplace/basket/app_bottom_bar.dart';
 import 'package:local_markerplace/provider/bloc/provider_bloc.dart';
+import 'package:local_markerplace/components/app_back_button.dart';
 import 'package:local_markerplace/components/motion/entrance.dart';
 import 'package:local_markerplace/core/app_color.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_note.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_tab_bar.dart';
 import 'package:local_markerplace/discovery/presentation/components/discovery_text.dart';
-import 'package:local_markerplace/provider/model/provider_profile.dart';
+import 'package:local_markerplace/components/skeleton/skeleton.dart';
+import 'package:local_markerplace/components/states/error_state.dart';
+import 'package:local_markerplace/network/failure.dart';
+import 'package:local_markerplace/provider/bloc/provider_profile_bloc.dart';
+import 'package:local_markerplace/provider/model/provider_detail.dart';
+import 'package:local_markerplace/provider/model/provider_display.dart';
 import 'package:local_markerplace/provider/model/provider_service.dart';
 import 'package:local_markerplace/provider/model/store_product.dart';
-import 'package:local_markerplace/provider/presentation/components/map_thumbnail.dart';
 import 'package:local_markerplace/provider/presentation/components/product_card.dart';
 import 'package:local_markerplace/provider/presentation/components/provider_hero.dart';
 import 'package:local_markerplace/provider/presentation/components/rating_summary.dart';
-import 'package:local_markerplace/provider/presentation/components/review_row.dart';
 import 'package:local_markerplace/provider/presentation/components/segmented_tabs.dart';
 import 'package:local_markerplace/provider/presentation/components/service_rows.dart';
-import 'package:local_markerplace/provider/repository/provider_repository.dart';
+import 'package:local_markerplace/provider/repository/provider_api_repository.dart';
 import 'package:local_markerplace/store/model/cart_product.dart';
 import 'package:local_markerplace/store/presentation/product_page.dart';
 import 'package:local_markerplace/visit/model/visit_service.dart';
@@ -35,41 +39,48 @@ import 'package:local_markerplace/visit/repository/visit_repository.dart';
 class ProviderProfilePage extends StatelessWidget {
   const ProviderProfilePage({
     super.key,
-    required this.providerName,
+    required this.slug,
     this.isSignedIn = true,
     this.initialTab = ProviderTab.services,
-    this.localityName = 'Ajnara Gen X',
-    this.repository = const ProviderRepository(),
+    this.localityName = '',
+    this.source,
     this.onTabSelected,
     this.onPost,
   });
 
-  final String providerName;
+  /// "dev-electricals" — how the endpoint names a provider. Everything on
+  /// the page is read from it; nothing is looked up by display name any more.
+  final String slug;
   final bool isSignedIn;
   final ProviderTab initialTab;
 
   /// The seeker's own area, which the store's free-delivery line names.
   final String localityName;
-  final ProviderRepository repository;
+  final ProviderSource? source;
   final ValueChanged<DiscoveryTab>? onTabSelected;
   final VoidCallback? onPost;
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) =>
-          ProviderBloc(
-            providerRepository: repository,
-            visitRepository: VisitRepository.shared,
-          )..add(
-            ProviderRequested(
-              providerName: providerName,
-              localityName: localityName,
-              initialTab: initialTab,
-            ),
-          ),
+    return MultiBlocProvider(
+      providers: [
+        // The page's data, a tab at a time.
+        BlocProvider(
+          create: (_) =>
+              ProviderProfileBloc(
+                providerSource: source ?? ProviderApiRepository.shared,
+              )..add(ProviderProfileRequested(slug)),
+        ),
+        // What of theirs is in the cart. Attached once the provider loads,
+        // because a cart belongs to a provider the endpoint has named.
+        BlocProvider(
+          create: (_) => ProviderBloc(visitRepository: VisitRepository.shared),
+        ),
+      ],
       child: _ProviderProfileView(
         isSignedIn: isSignedIn,
+        localityName: localityName,
+        initialTab: initialTab,
         onTabSelected: onTabSelected,
         onPost: onPost,
       ),
@@ -80,11 +91,15 @@ class ProviderProfilePage extends StatelessWidget {
 class _ProviderProfileView extends StatefulWidget {
   const _ProviderProfileView({
     required this.isSignedIn,
+    required this.localityName,
+    required this.initialTab,
     required this.onTabSelected,
     required this.onPost,
   });
 
   final bool isSignedIn;
+  final String localityName;
+  final ProviderTab initialTab;
   final ValueChanged<DiscoveryTab>? onTabSelected;
   final VoidCallback? onPost;
 
@@ -95,7 +110,9 @@ class _ProviderProfileView extends StatefulWidget {
 class _ProviderProfileViewState extends State<_ProviderProfileView> {
   ProviderBloc get _bloc => context.read<ProviderBloc>();
 
-  ProviderProfile get _profile => _bloc.state.profile!;
+  ProviderProfileBloc get _profileBloc => context.read<ProviderProfileBloc>();
+
+  ProviderDetail get _profile => _profileBloc.state.detail!;
 
   void _gatedAction(String what) {
     if (widget.isSignedIn) {
@@ -167,9 +184,48 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
   void _bookFitting(String serviceName) {
     Navigator.of(context).pop();
     _bloc.add(const ProviderTabSelected(ProviderTab.services));
-    final match = _profile.services.where((s) => s.name == serviceName);
+    final match = _profileBloc.state.offeredServices.where(
+      (service) => service.name == serviceName,
+    );
     if (match.isEmpty) return;
-    _addToVisit(match.first);
+    _addToVisit(match.first.asDisplay);
+  }
+
+  /// Switches tab, and asks that tab's own endpoint for what it shows.
+  ///
+  /// The About payload seeded every tab when the page opened, so this is a
+  /// refresh rather than a first load: the section keeps what it has while
+  /// the call is out, and a stale price or a part that sold out in the
+  /// meantime is corrected without the seeker doing anything. It is also
+  /// what gives the per-tab endpoints a job — seeded content that is never
+  /// refreshed would mean three endpoints nothing ever called.
+  void _selectTab(ProviderTab tab) {
+    _bloc.add(ProviderTabSelected(tab));
+    switch (tab) {
+      case ProviderTab.services:
+        _profileBloc.add(const ProviderServicesRequested());
+      case ProviderTab.store:
+        _profileBloc.add(const ProviderProductsRequested());
+      case ProviderTab.about:
+        _profileBloc.add(const ProviderAvailabilityRequested());
+      case ProviderTab.reviews:
+        _profileBloc.add(const ProviderReviewsRequested());
+    }
+  }
+
+  /// Tells the cart bloc who this page is for, once.
+  void _attachCart(ProviderDetail detail) {
+    if (_bloc.state.profile == detail) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _bloc.state.profile == detail) return;
+      _bloc.add(
+        ProviderRequested(
+          detail: detail,
+          localityName: widget.localityName,
+          initialTab: widget.initialTab,
+        ),
+      );
+    });
   }
 
   void _notice(String message) {
@@ -187,10 +243,27 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<ProviderBloc>().state;
-    if (state.profile == null) {
-      return const Scaffold(backgroundColor: AppColor.white);
+    final data = context.watch<ProviderProfileBloc>().state;
+
+    // The whole page is one provider, so until that one call answers there
+    // is nothing to draw and nothing to draw it around.
+    if (data.isLoading) return const _ProfileLoading();
+    if (data.detail == null) {
+      return _ProfileError(
+        state: data,
+        onRetry: () =>
+            _profileBloc.add(ProviderProfileRequested(data.slug)),
+      );
     }
+
+    // The cart belongs to a provider the endpoint has named, so it is
+    // attached once the call returns — and again if the page is reloaded
+    // onto somebody else. Done after the frame rather than in a listener,
+    // because the listener would be mounted by the build that already has
+    // the detail and so would never see it arrive.
+    _attachCart(data.detail!);
+
+    final state = context.watch<ProviderBloc>().state;
 
     return Scaffold(
       backgroundColor: AppColor.white,
@@ -218,11 +291,16 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
                   ),
                 ),
               ),
-            if (_profile.badgeNote != null)
+            // The endpoint says whether they are verified but not why not,
+            // so an unverified provider carries the pill and no explainer
+            // rather than one written here.
+            if (!_profile.verified)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: _BadgeNote(note: _profile.badgeNote!),
+                  child: _BadgeNote(
+                    note: 'This provider has not been verified by ServiQ.',
+                  ),
                 ),
               ),
             SliverPersistentHeader(
@@ -232,12 +310,12 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
                   color: AppColor.white,
                   child: ProviderSegmentedTabs(
                     current: state.tab,
-                    onSelect: (tab) => _bloc.add(ProviderTabSelected(tab)),
+                    onSelect: _selectTab,
                   ),
                 ),
               ),
             ),
-            ..._body(state),
+            ..._body(state, data),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
@@ -253,20 +331,69 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
     );
   }
 
-  List<Widget> _body(ProviderState state) {
+  List<Widget> _body(ProviderState state, ProviderProfileState data) {
     return switch (state.tab) {
-      ProviderTab.services => _servicesBody(state),
-      ProviderTab.store => _storeBody(state),
-      ProviderTab.reviews => _reviewsBody(state),
-      ProviderTab.about => _aboutBody(state),
+      ProviderTab.services => _servicesBody(state, data),
+      ProviderTab.store => _storeBody(state, data),
+      ProviderTab.reviews => _reviewsBody(data),
+      ProviderTab.about => _aboutBody(state, data),
     };
   }
 
-  List<Widget> _servicesBody(ProviderState state) {
-    final services = _profile.services;
-    if (services.isEmpty) {
-      return [const _Note('No services listed yet — coming soon.')];
+  /// The shape a tab wears while its endpoint answers. Never a spinner: the
+  /// section wears what it is about to become.
+  List<Widget> _tabSkeleton(String caption) => [
+    SliverToBoxAdapter(
+      child: SizedBox(
+        height: 340,
+        child: SkeletonList(caption: caption, rows: 3),
+      ),
+    ),
+  ];
+
+  /// What went wrong on one tab, and the way out of it. Only the tab is
+  /// taken over — the rest of the provider is still perfectly readable.
+  List<Widget> _tabError({
+    required Failure failure,
+    required String title,
+    required VoidCallback onRetry,
+  }) {
+    final isOffline = ProviderProfileState.isOffline(failure);
+
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: ErrorState(
+            isOffline: isOffline,
+            title: isOffline ? 'You are offline' : title,
+            body: isOffline
+                ? 'Nothing loaded because there is no connection.'
+                : 'Something went wrong on our side, not yours.',
+            onRetry: onRetry,
+            reference: isOffline ? null : failure.errorCode,
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _servicesBody(ProviderState state, ProviderProfileState data) {
+    if (data.isLoadingServices && !data.servicesLoaded) {
+      return _tabSkeleton('Loading services');
     }
+    if (data.servicesFailure != null && data.services.isEmpty) {
+      return _tabError(
+        failure: data.servicesFailure!,
+        title: "Couldn't load their services",
+        onRetry: () => _profileBloc.add(const ProviderServicesRequested()),
+      );
+    }
+    if (data.servicesAreEmpty) {
+      return [const _Note('This provider lists no services.')];
+    }
+
+    final services = data.offeredServices;
 
     return [
       SliverToBoxAdapter(
@@ -286,30 +413,43 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
         key: ValueKey(state.tab),
         itemCount: services.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, index) => FadeSlideIn(
-          index: index,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: ServiceCard(
-              service: services[index],
-              isOnVisit: state.isOnVisit(services[index].name),
-              onBook: widget.isSignedIn
-                  ? () => _addToVisit(services[index])
-                  : () => _gatedAction('book ${services[index].name}'),
-              onRemove: () =>
-                  _bloc.add(ProviderServiceRemoved(services[index].name)),
+        itemBuilder: (context, index) {
+          final service = services[index].asDisplay;
+          return FadeSlideIn(
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ServiceCard(
+                service: service,
+                isOnVisit: state.isOnVisit(service.name),
+                onBook: widget.isSignedIn
+                    ? () => _addToVisit(service)
+                    : () => _gatedAction('book ${service.name}'),
+                onRemove: () => _bloc.add(ProviderServiceRemoved(service.name)),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     ];
   }
 
-  List<Widget> _storeBody(ProviderState state) {
-    final products = _profile.products;
-    if (products.isEmpty) {
-      return [const _Note('No products listed yet — coming soon.')];
+  List<Widget> _storeBody(ProviderState state, ProviderProfileState data) {
+    if (data.isLoadingProducts && !data.productsLoaded) {
+      return _tabSkeleton('Loading their store');
     }
+    if (data.productsFailure != null && data.products.isEmpty) {
+      return _tabError(
+        failure: data.productsFailure!,
+        title: "Couldn't load their store",
+        onRetry: () => _profileBloc.add(const ProviderProductsRequested()),
+      );
+    }
+    if (data.productsAreEmpty) {
+      return [const _Note('This provider sells no parts.')];
+    }
+
+    final products = data.offeredProducts;
 
     // Only the cart this provider's parts are in — a cart belongs to one
     // provider, so another store's count would be a number about somebody
@@ -323,7 +463,8 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
           child: Row(
             children: [
               Text(
-                '${products.length} products',
+                '${products.length} '
+                '${products.length == 1 ? 'product' : 'products'}',
                 style: DiscoveryText.footnoteStrong,
               ),
               const Spacer(),
@@ -361,68 +502,66 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
             crossAxisSpacing: 12,
             mainAxisExtent: 196,
           ),
-          itemBuilder: (context, index) => FadeSlideIn(
-            index: index,
-            child: ProductCard(
-              product: products[index],
-              quantityInCart: state.quantityOf(products[index].name),
-              onTap: () => _openProduct(products[index]),
-              onAdd: widget.isSignedIn
-                  ? () => _openProduct(products[index])
-                  : () => _gatedAction('add ${products[index].name}'),
-              onIncrement: () => _bloc.add(
-                ProviderPartStepped(name: products[index].name, delta: 1),
+          itemBuilder: (context, index) {
+            final product = products[index].asDisplay;
+            return FadeSlideIn(
+              index: index,
+              child: ProductCard(
+                product: product,
+                quantityInCart: state.quantityOf(product.name),
+                onTap: () => _openProduct(product),
+                onAdd: widget.isSignedIn
+                    ? () => _openProduct(product)
+                    : () => _gatedAction('add ${product.name}'),
+                onIncrement: () =>
+                    _bloc.add(ProviderPartStepped(name: product.name, delta: 1)),
+                onDecrement: () => _bloc.add(
+                  ProviderPartStepped(name: product.name, delta: -1),
+                ),
               ),
-              onDecrement: () => _bloc.add(
-                ProviderPartStepped(name: products[index].name, delta: -1),
-              ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     ];
   }
 
-  List<Widget> _reviewsBody(ProviderState state) {
-    final reviews = _profile.reviews;
+  List<Widget> _reviewsBody(ProviderProfileState data) {
+    final rating = _profile.rating;
 
     return [
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
           child: RatingSummaryCard(
-            rating: _profile.rating,
-            reviewCount: _profile.reviewCount,
-            breakdown: _profile.ratingBreakdown,
+            rating: rating.average,
+            reviewCount: rating.total,
+            // Five stars down to one, as the card draws them, from the
+            // counts the endpoint keys by star.
+            breakdown: [
+              for (var star = 5; star >= 1; star--) rating.shareAt(star),
+            ],
           ),
         ),
       ),
-      if (reviews.isEmpty)
-        const _Note('No reviews yet.')
-      else
-        SliverList.separated(
-          key: ValueKey(state.tab),
-          itemCount: reviews.length,
-          separatorBuilder: (_, _) => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-            child: Divider(
-              height: 1,
-              thickness: 1,
-              color: AppColor.discoveryBorder,
-            ),
-          ),
-          itemBuilder: (context, index) => FadeSlideIn(
-            index: index,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(20, index == 0 ? 22 : 0, 20, 0),
-              child: ReviewRow(review: reviews[index]),
-            ),
-          ),
-        ),
+      if (data.isLoadingReviews && !data.reviewsLoaded)
+        ..._tabSkeleton('Loading reviews')
+      else if (data.reviewsFailure != null && data.reviews.isEmpty)
+        ..._tabError(
+          failure: data.reviewsFailure!,
+          title: "Couldn't load their reviews",
+          onRetry: () => _profileBloc.add(const ProviderReviewsRequested()),
+        )
+      else if (data.reviewsAreEmpty)
+        const _Note('No reviews yet.'),
     ];
   }
 
-  List<Widget> _aboutBody(ProviderState state) {
+  List<Widget> _aboutBody(ProviderState state, ProviderProfileState data) {
+    final about = _profile.about?.trim() ?? '';
+    final address = _profile.addressBlock;
+    final coverage = _profile.coverageBlock;
+
     return [
       SliverToBoxAdapter(
         key: ValueKey(state.tab),
@@ -431,27 +570,22 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              FadeSlideIn(
-                child: Text(_profile.about, style: DiscoveryText.body),
-              ),
-              const SizedBox(height: 20),
+              // Left out rather than written for them when they have said
+              // nothing about themselves.
+              if (about.isNotEmpty) ...[
+                FadeSlideIn(child: Text(about, style: DiscoveryText.body)),
+                const SizedBox(height: 20),
+              ],
               FadeSlideIn(
                 index: 1,
-                child: MapThumbnail(onTap: () => _notice('Map — coming soon.')),
-              ),
-              const SizedBox(height: 22),
-              FadeSlideIn(
-                index: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _Field(label: 'ADDRESS', value: _profile.address),
-                    _Field(label: 'HOURS', value: _profile.hours),
-                    _Field(
-                      label: 'SERVES',
-                      value: _profile.serves,
-                      isLast: true,
-                    ),
+                    if (address.isNotEmpty)
+                      _Field(label: 'ADDRESS', value: address),
+                    _hoursField(data),
+                    if (coverage.isNotEmpty)
+                      _Field(label: 'SERVES', value: coverage, isLast: true),
                   ],
                 ),
               ),
@@ -460,6 +594,26 @@ class _ProviderProfileViewState extends State<_ProviderProfileView> {
         ),
       ),
     ];
+  }
+
+  /// The week's hours, with the three states its own endpoint can be in.
+  Widget _hoursField(ProviderProfileState data) {
+    if (data.isLoadingAvailability && !data.availabilityLoaded) {
+      return const _Field(label: 'HOURS', value: 'Loading…');
+    }
+    if (data.availabilityFailure != null && data.availability.isEmpty) {
+      return _FieldAction(
+        label: 'HOURS',
+        value: "Couldn't load their hours.",
+        actionLabel: 'Try again',
+        onAction: () =>
+            _profileBloc.add(const ProviderAvailabilityRequested()),
+      );
+    }
+    if (data.availabilityIsEmpty) {
+      return const _Field(label: 'HOURS', value: 'No hours listed.');
+    }
+    return _Field(label: 'HOURS', value: data.availability.hoursBlock);
   }
 }
 
@@ -554,4 +708,105 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_TabsHeader oldDelegate) => oldDelegate.child != child;
+}
+
+/// The page before the provider has arrived.
+class _ProfileLoading extends StatelessWidget {
+  const _ProfileLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: AppColor.white,
+      body: SafeArea(
+        child: SkeletonList(caption: 'Loading this provider', hasHeader: true),
+      ),
+    );
+  }
+}
+
+/// The page when the provider could not be loaded at all.
+class _ProfileError extends StatelessWidget {
+  const _ProfileError({required this.state, required this.onRetry});
+
+  final ProviderProfileState state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final failure = state.failure;
+    final isOffline = ProviderProfileState.isOffline(failure);
+    // A slug nobody answers to is not a fault to apologise for — it is a
+    // provider who is not there, and saying so is the honest answer.
+    final isMissing = state.isNotFound;
+
+    return Scaffold(
+      backgroundColor: AppColor.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(14, 8, 20, 0),
+              child: Row(children: [AppBackButton()]),
+            ),
+            Expanded(
+              child: ErrorState(
+                isOffline: isOffline,
+                title: isMissing
+                    ? 'That provider is not here'
+                    : isOffline
+                    ? 'You are offline'
+                    : "Couldn't load this provider",
+                body: isMissing
+                    ? 'They may have closed, or the link may be out of date.'
+                    : isOffline
+                    ? 'Nothing loaded because there is no connection. They '
+                          'will be here when you are back.'
+                    : 'Something went wrong on our side, not yours.',
+                onRetry: onRetry,
+                reference: isOffline || isMissing ? null : failure?.errorCode,
+                occurredAt: isOffline ? null : state.failedAt,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A field whose value could not be loaded, with the way to try again.
+class _FieldAction extends StatelessWidget {
+  const _FieldAction({
+    required this.label,
+    required this.value,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final String label;
+  final String value;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: DiscoveryText.fieldLabel),
+          const SizedBox(height: 6),
+          Text(value, style: DiscoveryText.body),
+          const SizedBox(height: 6),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onAction,
+            child: Text(actionLabel, style: DiscoveryText.inlineLink),
+          ),
+        ],
+      ),
+    );
+  }
 }

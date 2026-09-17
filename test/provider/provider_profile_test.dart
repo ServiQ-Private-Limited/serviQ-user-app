@@ -1,15 +1,19 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:local_markerplace/provider/model/provider_profile.dart';
+import 'package:local_markerplace/components/skeleton/skeleton.dart';
+import 'package:local_markerplace/components/states/error_state.dart';
+import 'package:local_markerplace/network/failure.dart';
+import 'package:local_markerplace/provider/model/provider_detail.dart';
 import 'package:local_markerplace/provider/presentation/components/segmented_tabs.dart';
 import 'package:local_markerplace/provider/presentation/provider_profile_page.dart';
-import 'package:local_markerplace/provider/repository/provider_repository.dart';
 
-const _shahnaz = 'Shahnaz RO & Chimney Services';
+import '../support/fake_provider_source.dart';
+import 'provider_api_test.dart' show capturedProvider, capturedReviews;
 
 Future<void> loadFonts() async {
   for (final path in const [
@@ -23,32 +27,81 @@ Future<void> loadFonts() async {
   }
 }
 
+/// The provider's page, drawn from the payloads the endpoints return.
 void main() {
-  const repository = ProviderRepository();
-
   setUpAll(loadFonts);
 
-  Future<void> pump(WidgetTester tester, Widget screen, {Size? size}) async {
+  Map<String, dynamic> dataOf(String raw) =>
+      (jsonDecode(raw) as Map<String, dynamic>)['responseData']
+          as Map<String, dynamic>;
+
+  ProviderDetail detail() => ProviderDetail.fromJson(dataOf(capturedProvider));
+
+  FakeProviderSource source({
+    ProviderDetail? provider,
+    Failure? profileFailure,
+    Failure? productsFailure,
+    Duration delay = Duration.zero,
+  }) {
+    return FakeProviderSource(
+      detail: profileFailure == null ? (provider ?? detail()) : null,
+      reviewPage: ProviderReviewPage.fromJson(dataOf(capturedReviews)),
+      profileFailure: profileFailure,
+      productsFailure: productsFailure,
+      delay: delay,
+    );
+  }
+
+  Future<void> pump(
+    WidgetTester tester,
+    Widget screen, {
+    Size? size,
+    bool settle = true,
+  }) async {
     final target = size ?? const Size(390, 844);
     tester.view.physicalSize = target * 3;
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(home: screen));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
+    if (settle) {
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
   }
+
+  testWidgets('the page waits on a skeleton, never a spinner', (tester) async {
+    await pump(
+      tester,
+      ProviderProfilePage(
+        slug: 'dev-electricals',
+        source: source(delay: const Duration(milliseconds: 400)),
+      ),
+      settle: false,
+    );
+    await tester.pump();
+
+    expect(find.byType(SkeletonList), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Dev Electricals'), findsOneWidget);
+  });
 
   testWidgets('a signed-out visitor can read the page but not act on it', (
     tester,
   ) async {
     await pump(
       tester,
-      const ProviderProfilePage(providerName: _shahnaz, isSignedIn: false),
+      ProviderProfilePage(
+        slug: 'dev-electricals',
+        isSignedIn: false,
+        source: source(),
+      ),
     );
 
-    expect(find.text(_shahnaz), findsOneWidget);
+    expect(find.text('Dev Electricals'), findsOneWidget);
     expect(find.text('VERIFIED'), findsOneWidget);
-    // The actions say what signing in would buy them.
     expect(find.text('Sign in to connect'), findsOneWidget);
     expect(find.text('Sign in to chat'), findsOneWidget);
     expect(find.textContaining('This page is public'), findsOneWidget);
@@ -57,47 +110,132 @@ void main() {
   testWidgets('signing in turns the gated actions into real ones', (
     tester,
   ) async {
-    await pump(tester, const ProviderProfilePage(providerName: _shahnaz));
+    await pump(
+      tester,
+      ProviderProfilePage(slug: 'dev-electricals', source: source()),
+    );
 
     expect(find.text('Connect'), findsOneWidget);
     expect(find.text('Chat'), findsOneWidget);
     expect(find.textContaining('This page is public'), findsNothing);
   });
 
-  testWidgets('the four tabs each show their own content', (tester) async {
-    await pump(tester, const ProviderProfilePage(providerName: _shahnaz));
+  testWidgets('opening a tab asks that tab own endpoint', (tester) async {
+    final fake = source();
+    await pump(
+      tester,
+      ProviderProfilePage(slug: 'dev-electricals', source: fake),
+    );
 
-    expect(find.text('AC Servicing'), findsOneWidget);
+    await tester.tap(find.text('Store'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('About'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Services'));
+    await tester.pumpAndSettle();
+
+    // Opening a section refreshes it, which is what the per-tab endpoints
+    // are for — seeded content nothing ever refreshed would mean three
+    // endpoints the app never called.
+    expect(fake.asked, contains('products:dev-electricals'));
+    expect(fake.asked, contains('availability:dev-electricals'));
+    expect(fake.asked, contains('services:dev-electricals'));
+  });
+
+  testWidgets('each tab shows what its endpoint returned', (tester) async {
+    await pump(
+      tester,
+      ProviderProfilePage(slug: 'dev-electricals', source: source()),
+    );
+
+    // Services — the names and prices the endpoint sent.
+    expect(find.text('AC servicing'), findsOneWidget);
+    expect(find.text('from ₹599'), findsOneWidget);
 
     await tester.tap(find.text('Reviews'));
     await tester.pumpAndSettle();
-    expect(find.text('128 reviews'), findsOneWidget);
-    expect(find.text('Anita Sharma'), findsOneWidget);
+    // Unrated, and the page says so rather than drawing empty stars.
+    expect(find.text('No reviews yet.'), findsOneWidget);
 
     await tester.tap(find.text('About'));
     await tester.pumpAndSettle();
     expect(find.text('ADDRESS'), findsOneWidget);
     expect(find.text('HOURS'), findsOneWidget);
+    expect(find.text('SERVES'), findsOneWidget);
+    expect(
+      find.textContaining('Seeded partner for the DEV environment.'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Store'));
     await tester.pumpAndSettle();
-    expect(find.text('RO Filter Set (3 stage)'), findsOneWidget);
-    expect(find.text('Only 2 left'), findsOneWidget);
+    expect(find.text('Extension board'), findsOneWidget);
+    // The count the endpoint gave, not a judgement about it.
+    expect(find.text('7 in stock'), findsOneWidget);
   });
 
-  testWidgets('an unbadged provider explains why there is no check', (
+  testWidgets('a provider with no services says so', (tester) async {
+    final bare = ProviderDetail.fromJson({
+      ...dataOf(capturedProvider),
+      'services': const [],
+      'products': const [],
+    });
+
+    await pump(
+      tester,
+      ProviderProfilePage(
+        slug: 'dev-electricals',
+        source: source(provider: bare),
+      ),
+    );
+
+    expect(find.text('This provider lists no services.'), findsOneWidget);
+
+    await tester.tap(find.text('Store'));
+    await tester.pumpAndSettle();
+    expect(find.text('This provider sells no parts.'), findsOneWidget);
+  });
+
+  testWidgets('a provider that is not there is said plainly', (tester) async {
+    await pump(
+      tester,
+      ProviderProfilePage(
+        slug: 'no-such-shop',
+        source: source(
+          profileFailure: const Failure(
+            errorMessage: 'Provider not found.',
+            errorCode: 'PROVIDER_NOT_FOUND',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(ErrorState), findsOneWidget);
+    expect(find.text('That provider is not here'), findsOneWidget);
+    // Not our fault to apologise for, so no reference to quote.
+    expect(find.textContaining('PROVIDER_NOT_FOUND'), findsNothing);
+  });
+
+  testWidgets('one tab failing leaves the rest of the page readable', (
     tester,
   ) async {
     await pump(
       tester,
-      const ProviderProfilePage(providerName: 'Imran AC Works'),
+      ProviderProfilePage(
+        slug: 'dev-electricals',
+        source: source(
+          productsFailure: const Failure(
+            errorMessage: 'Something went wrong.',
+            errorCode: 'INTERNAL_ERROR',
+          ),
+        ),
+      ),
     );
 
-    expect(find.text('PROVIDER'), findsOneWidget);
-    expect(find.text('No verified badge'), findsOneWidget);
-    expect(find.textContaining('has no GSTIN'), findsOneWidget);
-    // Still bookable.
-    expect(find.text('Connect'), findsOneWidget);
+    // The About payload seeded the store, so the tab reads until it is
+    // asked to refresh — the provider itself is never taken away.
+    expect(find.text('Dev Electricals'), findsOneWidget);
+    expect(find.text('AC servicing'), findsOneWidget);
   });
 
   for (final size in const [
@@ -111,42 +249,14 @@ void main() {
           '${size.height.toInt()}', (tester) async {
         await pump(
           tester,
-          ProviderProfilePage(providerName: _shahnaz, initialTab: tab),
+          ProviderProfilePage(
+            slug: 'dev-electricals',
+            initialTab: tab,
+            source: source(),
+          ),
           size: size,
         );
       });
     }
   }
-
-  test('the head lists the visit charge, the tab lists what a job covers', () {
-    final profile = repository.forName(_shahnaz);
-    final summary = repository.summaryServices(profile);
-
-    expect(summary.first.detail, contains('Visit charge'));
-    expect(profile.services.first.detail, isNot(contains('Visit charge')));
-    expect(summary.length, profile.services.length);
-  });
-
-  test('an unknown provider falls back rather than showing nothing', () {
-    expect(repository.byName('Nobody'), isNull);
-    expect(repository.forName('Nobody').name, _shahnaz);
-  });
-
-  test('a rating breakdown is a share of the whole', () {
-    final profile = repository.forName(_shahnaz);
-    final total = profile.ratingBreakdown.reduce((a, b) => a + b);
-
-    expect(profile.ratingBreakdown, hasLength(5));
-    expect(total, closeTo(1.0, 0.01));
-  });
-
-  test('initials come from the business name', () {
-    expect(repository.forName(_shahnaz).initials, 'SR');
-    expect(repository.forName('Imran AC Works').initials, 'IA');
-  });
-
-  test('a verified profile carries the badge, an individual does not', () {
-    expect(repository.forName(_shahnaz).badge, ProviderBadge.verified);
-    expect(repository.forName('Imran AC Works').badge, ProviderBadge.provider);
-  });
 }
